@@ -1,5 +1,3 @@
-# Dreamer
+# Mastering Diverse Domains through World Models
 
-```sh
-uv run -- python -m minigrid.manual_control --env MiniGrid-Empty-8x8-v0
-```
+This repository contains my implementation of DreamerV3.

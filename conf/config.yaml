@@ -1,5 +1,9 @@
+environment:
+  name: "CarRacing-v3"
+
 replay_buffer:
   capacity: 10_000
 
 dreamer:
-  - a
+  reccurent_dim: 128
+  latent_dim: 16
