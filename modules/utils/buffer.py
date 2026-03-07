@@ -48,7 +48,7 @@ class ReplayBuffer:
 
         # filter out start indices where the sequence crosses an episode boundary.
         # a done=True at step t means the episode ended there; step t+1 belongs to a new episode.
-        # so we check the first (sequence_length - 1) dones — if any are True, the sequence is invalid.
+        # so we check the first (sequence_length - 1) dones. if any are True, the sequence is invalid.
         if sequence_length > 1:
             start_index_pool = np.array([
                 idx for idx in start_index_pool
