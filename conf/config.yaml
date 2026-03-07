@@ -1,5 +1,6 @@
 environment:
   name: "CarRacing-v3"
+  resize_observation: [64, 64]
 
 replay_buffer:
   capacity: 10_000

@@ -8,14 +8,14 @@ class ReplayBuffer:
         if capacity <= 0:
             raise ValueError("Replay buffer capacity must be greater than zero.")
 
-        self.capacity           = capacity
-        self.is_full            = False
-        self.buffer_index       = 0  # pointer to the next index to insert a transition
+        self.capacity       = capacity
+        self.is_full        = False
+        self.buffer_index   = 0  # pointer to the next index to insert a transition
         # internal buffer arrays to store transitions
-        self.observations       = np.zeros((capacity, *observation_shape), dtype=dtype)
-        self.actions            = np.zeros((capacity, *action_shape), dtype=dtype)
-        self.rewards            = np.zeros((capacity,), dtype=dtype)
-        self.dones              = np.zeros((capacity,), dtype=dtype)
+        self.observations   = np.zeros((capacity, *observation_shape), dtype=dtype)
+        self.actions        = np.zeros((capacity, *action_shape), dtype=dtype)
+        self.rewards        = np.zeros((capacity,), dtype=dtype)
+        self.dones          = np.zeros((capacity,), dtype=dtype)
 
     def __len__(self):
         """Get the current number of transitions stored in the buffer."""
@@ -23,10 +23,10 @@ class ReplayBuffer:
 
     def add(self, observation, action, reward, done):
         """Add a transition to the replay buffer, overwriting old transitions if capacity is exceeded."""
-        self.observations[self.buffer_index]        = observation
-        self.actions[self.buffer_index]             = action
-        self.rewards[self.buffer_index]             = reward
-        self.dones[self.buffer_index]               = done
+        self.observations[self.buffer_index]    = observation
+        self.actions[self.buffer_index]         = action
+        self.rewards[self.buffer_index]         = reward
+        self.dones[self.buffer_index]           = done
 
         # increment buffer index and wrap around if we exceed capacity, overwriting old transitions
         self.buffer_index = (self.buffer_index + 1) % self.capacity
@@ -60,10 +60,10 @@ class ReplayBuffer:
 
         start_indices = np.random.choice(start_index_pool, size=batch_size, replace=False)
         # gather sequences of transitions for each sampled start index
-        batch_observations      = np.array([gather_sequence(self.observations, idx, sequence_length)for idx in start_indices])
-        batch_actions           = np.array([gather_sequence(self.actions, idx, sequence_length)for idx in start_indices])
-        batch_rewards           = np.array([gather_sequence(self.rewards, idx, sequence_length)for idx in start_indices])
-        batch_dones             = np.array([gather_sequence(self.dones, idx, sequence_length) for idx in start_indices])
+        batch_observations  = np.array([gather_sequence(self.observations, idx, sequence_length)for idx in start_indices])
+        batch_actions       = np.array([gather_sequence(self.actions, idx, sequence_length)for idx in start_indices])
+        batch_rewards       = np.array([gather_sequence(self.rewards, idx, sequence_length)for idx in start_indices])
+        batch_dones         = np.array([gather_sequence(self.dones, idx, sequence_length) for idx in start_indices])
         return {
             "observations": batch_observations,
             "actions":      batch_actions,
