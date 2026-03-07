@@ -5,5 +5,5 @@ replay_buffer:
   capacity: 10_000
 
 dreamer:
-  reccurent_dim: 128
+  recurrent_dim: 128
   latent_dim: 16
