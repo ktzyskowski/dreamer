@@ -1,4 +1,5 @@
-db:
-  driver: mysql
-  user: omry
-  pass: secret
+replay_buffer:
+  capacity: 10_000
+
+dreamer:
+  - a

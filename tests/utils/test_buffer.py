@@ -8,9 +8,8 @@ def make_transition(value, observation_shape, action_shape):
     observation = np.full(observation_shape, value, dtype=np.float32)
     action = np.full(action_shape, value, dtype=np.float32)
     reward = float(value)
-    next_observation = observation + 100.0
     done = float(value % 2)
-    return observation, action, reward, next_observation, done
+    return observation, action, reward, done
 
 
 def test_constructor_negative_capacity_raises():
@@ -53,7 +52,6 @@ def test_sample_non_full_sequences_and_shapes():
     assert batch["observations"].shape == (2, 3, 3)
     assert batch["actions"].shape == (2, 3, 1)
     assert batch["rewards"].shape == (2, 3)
-    assert batch["next_observations"].shape == (2, 3, 3)
     assert batch["dones"].shape == (2, 3)
 
 

@@ -15,19 +15,17 @@ class ReplayBuffer:
         self.observations       = np.zeros((capacity, *observation_shape), dtype=dtype)
         self.actions            = np.zeros((capacity, *action_shape), dtype=dtype)
         self.rewards            = np.zeros((capacity,), dtype=dtype)
-        self.next_observations  = np.zeros((capacity, *observation_shape), dtype=dtype)
         self.dones              = np.zeros((capacity,), dtype=dtype)
 
     def __len__(self):
         """Get the current number of transitions stored in the buffer."""
         return self.capacity if self.is_full else self.buffer_index
 
-    def add(self, observation, action, reward, next_observation, done):
+    def add(self, observation, action, reward, done):
         """Add a transition to the replay buffer, overwriting old transitions if capacity is exceeded."""
         self.observations[self.buffer_index]        = observation
         self.actions[self.buffer_index]             = action
         self.rewards[self.buffer_index]             = reward
-        self.next_observations[self.buffer_index]   = next_observation
         self.dones[self.buffer_index]               = done
 
         # increment buffer index and wrap around if we exceed capacity, overwriting old transitions
@@ -53,13 +51,11 @@ class ReplayBuffer:
         batch_observations      = np.array([gather_sequence(self.observations, idx, sequence_length)for idx in start_indices])
         batch_actions           = np.array([gather_sequence(self.actions, idx, sequence_length)for idx in start_indices])
         batch_rewards           = np.array([gather_sequence(self.rewards, idx, sequence_length)for idx in start_indices])
-        batch_next_observations = np.array([gather_sequence(self.next_observations, idx, sequence_length)for idx in start_indices])
         batch_dones             = np.array([gather_sequence(self.dones, idx, sequence_length) for idx in start_indices])
         return {
             "observations":      batch_observations,
             "actions":           batch_actions,
             "rewards":           batch_rewards,
-            "next_observations": batch_next_observations,
             "dones":             batch_dones,
         }
 
