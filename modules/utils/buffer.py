@@ -4,7 +4,14 @@ import numpy as np
 class ReplayBuffer:
     """Replay buffer for storing and sampling sequences of transitions."""
 
-    def __init__(self, observation_shape, action_shape, capacity, dtype=np.float32):
+    def __init__(
+        self,
+        observation_shape,
+        action_shape,
+        recurrent_dim,
+        capacity,
+        dtype=np.float32,
+    ):
         if capacity <= 0:
             raise ValueError("Replay buffer capacity must be greater than zero.")
 
@@ -16,17 +23,19 @@ class ReplayBuffer:
         self.actions = np.zeros((capacity, *action_shape), dtype=dtype)
         self.rewards = np.zeros((capacity,), dtype=dtype)
         self.dones = np.zeros((capacity,), dtype=dtype)
+        self.recurrent_states = np.zeros((capacity, recurrent_dim), dtype=dtype)
 
     def __len__(self):
         """Get the current number of transitions stored in the buffer."""
         return self.capacity if self.is_full else self.buffer_index
 
-    def add(self, observation, action, reward, done):
+    def add(self, observation, action, reward, done, recurrent_state):
         """Add a transition to the replay buffer, overwriting old transitions if capacity is exceeded."""
         self.observations[self.buffer_index] = observation
         self.actions[self.buffer_index] = action
         self.rewards[self.buffer_index] = reward
         self.dones[self.buffer_index] = done
+        self.recurrent_states[self.buffer_index] = recurrent_state
 
         # increment buffer index and wrap around if we exceed capacity, overwriting old transitions
         self.buffer_index = (self.buffer_index + 1) % self.capacity

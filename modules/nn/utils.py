@@ -1,3 +1,6 @@
+import torch
+
+
 def count_parameters(model):
     """Count the number of trainable parameters in a given model.
 
@@ -16,3 +19,19 @@ def deconstruct_batch(batch):
     rewards = batch["rewards"]
     dones = batch["dones"]
     return observations, actions, rewards, dones
+
+
+def mixin_uniform(probs, split=0.01, dim=-1):
+    # create uniform distribution over specified dimension
+    uniform = torch.ones_like(probs) / probs.shape[dim]
+    # mix uniform with given distribution
+    mixed = (1 - split) * probs + split * uniform
+    return mixed
+
+
+def symlog(x):
+    return torch.sign(x) * torch.log(torch.abs(x) + 1)
+
+
+def symexp(x):
+    return torch.sign(x) * (torch.exp(torch.abs(x)) - 1)
