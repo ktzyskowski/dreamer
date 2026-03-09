@@ -18,7 +18,8 @@ def deconstruct_batch(batch):
     actions = batch["actions"]
     rewards = batch["rewards"]
     dones = batch["dones"]
-    return observations, actions, rewards, dones
+    recurrent_states = batch["recurrent_states"]
+    return observations, actions, rewards, dones, recurrent_states
 
 
 def mixin_uniform(probs, split=0.01, dim=-1):
@@ -30,8 +31,10 @@ def mixin_uniform(probs, split=0.01, dim=-1):
 
 
 def symlog(x):
+    # Eq (9)
     return torch.sign(x) * torch.log(torch.abs(x) + 1)
 
 
 def symexp(x):
+    # Eq (9)
     return torch.sign(x) * (torch.exp(torch.abs(x)) - 1)

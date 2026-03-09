@@ -106,11 +106,18 @@ class ReplayBuffer:
         batch_dones = np.array(
             [gather_sequence(self.dones, idx, sequence_length) for idx in start_indices]
         )
+        batch_recurrent_states = np.array(
+            [
+                gather_sequence(self.recurrent_states, idx, sequence_length)
+                for idx in start_indices
+            ]
+        )
         return {
             "observations": batch_observations,
             "actions": batch_actions,
             "rewards": batch_rewards,
             "dones": batch_dones,
+            "recurrent_states": batch_recurrent_states,
         }
 
 

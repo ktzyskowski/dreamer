@@ -2,7 +2,10 @@ from torch import nn
 
 
 def conv2d_output_size(input_size: int, kernel_size: int, stride: int, padding: int):
-    return (input_size + 2 * padding - kernel_size) // stride + 1
+    output_size = (input_size + 2 * padding - kernel_size) // stride + 1
+    if output_size <= 0:
+        raise ValueError("Invalid CNN configuration.")
+    return output_size
 
 
 # Encoder
@@ -72,10 +75,10 @@ class Encoder(nn.Module):
         """Encode an image observation.
 
         Args:
-            - observation: (batch, sequence, channel, height, width) tensor of observations
+            - observation: (batch, sequence, channel, height, width) tensor of observations.
 
         Returns:
-            - embedding: (batch, sequence, output_dim) tensor of latent embeddings
+            - embedding: (batch, sequence, output_dim) tensor of latent embeddings.
         """
         # merge batch and sequence dimensions for CNN processing: (batch * sequence, channel, height, width)
         batch_size, sequence_length = observation.shape[0], observation.shape[1]
@@ -83,7 +86,7 @@ class Encoder(nn.Module):
             batch_size * sequence_length, *self.observation_shape
         )
         # compute embedding for each observation: (batch * sequence, output_dim)
-        encoding = self.cnn(observation)
+        latent = self.cnn(observation)
         # un-merge batch and sequence dimensions: (batch, sequence, output_dim)
-        encoding = encoding.view(batch_size, sequence_length, self.output_dim)
-        return encoding
+        latent = latent.view(batch_size, sequence_length, self.output_dim)
+        return latent

@@ -29,6 +29,7 @@ def main(config: DictConfig):
         replay_buffer = ReplayBuffer(
             observation_shape=observation_space.shape,
             action_shape=action_space.shape,
+            recurrent_dim=128,
             capacity=config.replay_buffer.capacity,
         )
 
@@ -45,7 +46,7 @@ def main(config: DictConfig):
                 next_observation, reward, done = env.step(action)
 
                 # add experience to replay buffer
-                replay_buffer.add(observation, action, reward, done)
+                replay_buffer.add(observation, action, reward, done, recurrent_state)
 
                 if done:
                     observation = env.reset()
