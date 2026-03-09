@@ -8,3 +8,24 @@ replay_buffer:
 dreamer:
   recurrent_dim: 128
   latent_dim: 16
+
+# Replay ratio controls how many environment steps are taken in between
+# gradient updates. For example, a value of 32 (and action repeat of 4)
+# indicates that 32x4=128 env steps are taken (and stored in the replay
+# buffer) before another gradient update step is taken.
+replay_ratio: 32
+
+# Action repeat controls how many times an action is repeated until an
+# observation is returned. Useful if the environment has high frame rate
+# (similar to "holding" a button down through N frames). The intermediate
+# frames are discarded, only the last is kept. Reward is summed.
+action_repeat: 1
+
+# Batch size controls the number of transition sequences sampled from
+# the replay buffer during one gradient update step.
+batch_size: 16
+
+# Sequence length controls the length of each transition sequence sampled
+# in a batch. Combined, both contribute to total number of env steps used
+# during one gradient update.
+sequence_length: 64

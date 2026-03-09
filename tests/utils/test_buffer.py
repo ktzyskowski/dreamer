@@ -8,7 +8,7 @@ def make_transition(value, observation_shape, action_shape):
     observation = np.full(observation_shape, value, dtype=np.float32)
     action = np.full(action_shape, value, dtype=np.float32)
     reward = float(value)
-    done = float(value % 2)
+    done = 0
     return observation, action, reward, done
 
 
@@ -73,7 +73,9 @@ def test_sample_full_buffer_wrapping_sequences():
         # find a matching start index by searching the first element of the sequence
         seq0 = obs[b][0][0]
         # look for index in buffer where value equals seq0
-        idxs = [i for i in range(capacity) if int(buffer.observations[i][0]) == int(seq0)]
+        idxs = [
+            i for i in range(capacity) if int(buffer.observations[i][0]) == int(seq0)
+        ]
         # at least one match should exist
         assert idxs
 
