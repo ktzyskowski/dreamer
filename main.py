@@ -3,19 +3,22 @@ import logging
 import hydra
 from omegaconf import DictConfig
 
-from modules.dreamer import Dreamer
+# from modules.dreamer import Dreamer
 from modules.utils.buffer import ReplayBuffer
 from modules.utils.env import EnvironmentManager
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="config")
+@hydra.main(
+    version_base=None,
+    config_path="conf",
+    config_name="config",
+)
 def main(config: DictConfig):
     # set up logging
     logging.basicConfig()
 
     # context manager automatically handles environment during training
     with EnvironmentManager() as env:
-
         # log observation/action space information
         observation_space = env.observation_space
         action_space = env.action_space
@@ -23,7 +26,11 @@ def main(config: DictConfig):
         logging.info("Action space: %s", str(action_space))
 
         # dreamer class contains training code
-        # dreamer = Dreamer(env)
+        # dreamer = Dreamer(
+        #     world_model=WorldModel(),
+        #     actor=...,
+        #     critic=...,
+        # )
 
         # replay buffer will hold actual experience collected from environment.
         replay_buffer = ReplayBuffer(
@@ -33,7 +40,8 @@ def main(config: DictConfig):
             capacity=config.replay_buffer.capacity,
         )
 
-        # observation, recurrent_state = env.reset(), None
+        observation, recurrent_state = env.reset(), None
+        print(observation.shape)
         # for _ in range(100):
         #     # 1. collect experience
         #     for _ in range(config.replay_ratio):

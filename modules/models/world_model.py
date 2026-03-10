@@ -1,6 +1,7 @@
 from torch import nn
 import torch
 
+from modules.nn.encoder import Encoder
 from modules.nn.mlp import MultiLayerPerceptron
 
 # full_state = cat[recurrent_state, latent_state]
@@ -19,11 +20,14 @@ class WorldModel(nn.Module):
         latent_dim,
     ):
         super().__init__()
-
-        self.recurrent_dim = recurrent_dim
-        self.latent_dim = latent_dim
-        self.model_state_dim = recurrent_dim + latent_dim
-
+        # internal networks
+        self.encoder = Encoder(
+            observation_shape,
+            output_dim=latent_dim,
+            kernel_size=3,
+            stride=2,
+            padding=0,
+        )
         self.reward_predictor = MultiLayerPerceptron(
             input_dim=self.model_state_dim,
             hidden_dims=(128, 128),
@@ -35,51 +39,78 @@ class WorldModel(nn.Module):
             output_dim=1,
         )
 
-    def encode(self, observation, recurrent_state=None, no_grad=False):
+    def step(self, observation, action, recurrent_state):
         """
         Args:
-            observation: (optional[batch, sequence], channel, height, width)
-            recurrent_state: (optional[batch, sequence], recurrent_dim)
-            no_grad: bool
+            observation (*observation_shape):
+            action (*action_shape):
+            recurrent_state (recurrent_dim):
         Returns:
-            model_state:
+            recurrent_state (recurrent_dim):
+            discrete_state (discrete_dim):
         """
+        # add (batch, sequence) dimensions to single observation
+        observation = observation.unsqueeze(0).unsqueeze(0)
+        
+        # encode observation
+        latent = self.encoder(observation)
+        
+        # concatenate with recurrent state to get full model state
+        model_state = torch.cat((latent, recurrent_state), dim=-1)
+
+        return h, z
+
+    def observe(self, observations, actions):
         pass
 
-    def sequence(self, model_state, action):
-        """
-        Args:
-            model_state: (optional[batch, sequence], )
-            action: (optional[batch, sequence], )
-        """
+    def imagine(self):
         pass
 
-    def decode(self, model_state):
-        """
-        Args:
-            model_state: (batch, sequence, ?)
-        Returns:
-            observation: (batch, sequence, channel, height, width)
-        """
-        pass
+    # def encode(self, observation, recurrent_state=None, no_grad=False):
+    #     """
+    #     Args:
+    #         observation: (optional[batch, sequence], channel, height, width)
+    #         recurrent_state: (optional[batch, sequence], recurrent_dim)
+    #         no_grad: bool
+    #     Returns:
+    #         model_state:
+    #     """
+    #     pass
 
-    def predict_reward(self, model_state):
-        """
-        Args:
-            model_state: (batch, sequence, ?)
-        Returns:
-            observation: Normal(batch, sequence)
-        """
-        pass
+    # def sequence(self, model_state, action):
+    #     """
+    #     Args:
+    #         model_state: (optional[batch, sequence], )
+    #         action: (optional[batch, sequence], )
+    #     """
+    #     pass
 
-    def predict_continue(self, model_state):
-        """
-        Args:
-            model_state (batch, sequence, ?)
-        Returns:
-            observation: Bernoulli(batch, sequence)
-        """
-        logits = self.continue_predictor(model_state)
-        logits = logits.squeeze(-1)
-        distribution = torch.distributions.Bernoulli(logits=logits)
-        return distribution
+    # def decode(self, model_state):
+    #     """
+    #     Args:
+    #         model_state: (batch, sequence, ?)
+    #     Returns:
+    #         observation: (batch, sequence, channel, height, width)
+    #     """
+    #     pass
+
+    # def predict_reward(self, model_state):
+    #     """
+    #     Args:
+    #         model_state: (batch, sequence, ?)
+    #     Returns:
+    #         observation: Normal(batch, sequence)
+    #     """
+    #     pass
+
+    # def predict_continue(self, model_state):
+    #     """
+    #     Args:
+    #         model_state (batch, sequence, ?)
+    #     Returns:
+    #         observation: Bernoulli(batch, sequence)
+    #     """
+    #     logits = self.continue_predictor(model_state)
+    #     logits = logits.squeeze(-1)
+    #     distribution = torch.distributions.Bernoulli(logits=logits)
+    #     return distribution

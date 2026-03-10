@@ -1,21 +1,13 @@
-from modules.models.actor import Actor
-from modules.models.critic import Critic
-from modules.models.world_model import WorldModel
-from modules.utils.buffer import ReplayBuffer
-
-
 class Dreamer:
-    def __init__(self, observation_space, action_space):
-        self.world_model = WorldModel()
-        self.actor = Actor()
-        self.critic = Critic()
+    def __init__(self, world_model, actor, critic, replay_buffer, env):
+        self.world_model = world_model
+        self.actor = actor
+        self.critic = critic
+        self.replay_buffer = replay_buffer
+        self.env = env
 
-        self.replay_buffer = ReplayBuffer(
-            observation_shape=observation_space.shape,
-            action_shape=action_space.shape,
-            recurrent_dim=128,
-            capacity=10_000,
-        )
+    def collect_samples(self):
+        pass
 
     def train_world_model(self):
         pass
