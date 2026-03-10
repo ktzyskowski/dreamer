@@ -23,7 +23,7 @@ def main(config: DictConfig):
         logging.info("Action space: %s", str(action_space))
 
         # dreamer class contains training code
-        dreamer = Dreamer(env)
+        # dreamer = Dreamer(env)
 
         # replay buffer will hold actual experience collected from environment.
         replay_buffer = ReplayBuffer(
@@ -33,28 +33,26 @@ def main(config: DictConfig):
             capacity=config.replay_buffer.capacity,
         )
 
-        observation, recurrent_state = env.reset(), None
-        for _ in range(100):
-            # 1. collect experience
-            for _ in range(config.replay_ratio):
-                model_state = world_model.encode(
-                    observation, recurrent_state, no_grad=True
-                )
-                action = actor(model_state, no_grad=True)
+        # observation, recurrent_state = env.reset(), None
+        # for _ in range(100):
+        #     # 1. collect experience
+        #     for _ in range(config.replay_ratio):
+        #         model_state = world_model.encode(observation, recurrent_state, no_grad=True)
+        #         action = actor(model_state, no_grad=True)
 
-                # take sampled action in environment, observe next observation and reward
-                next_observation, reward, done = env.step(action)
+        #         # take sampled action in environment, observe next observation and reward
+        #         next_observation, reward, done = env.step(action)
 
-                # add experience to replay buffer
-                replay_buffer.add(observation, action, reward, done, recurrent_state)
+        #         # add experience to replay buffer
+        #         replay_buffer.add(observation, action, reward, done, recurrent_state)
 
-                if done:
-                    observation = env.reset()
-                else:
-                    observation = next_observation
+        #         if done:
+        #             observation = env.reset()
+        #         else:
+        #             observation = next_observation
 
-            # 2. perform gradient update step
-            batch = replay_buffer.sample(config.batch_size, config.sequence_length)
+        #     # 2. perform gradient update step
+        #     batch = replay_buffer.sample(config.batch_size, config.sequence_length)
 
 
 if __name__ == "__main__":

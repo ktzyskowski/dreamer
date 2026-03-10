@@ -62,7 +62,7 @@ class Decoder(nn.Module):
                 stride=stride,
                 padding=padding,
             ),
-            # TODO: revisit putting a sigmoid activation here
+            nn.Sigmoid(),
         )
 
     def forward(self, latent):
@@ -80,7 +80,5 @@ class Decoder(nn.Module):
         # reconstruct observation: (batch * sequence, channel, height, width)
         observation = self.net(latent)
         # un-merge batch and sequence dimensions: (batch, sequence, channel, height, width)
-        observation = observation.view(
-            batch_size, sequence_length, *self.observation_shape
-        )
+        observation = observation.view(batch_size, sequence_length, *self.observation_shape)
         return observation
