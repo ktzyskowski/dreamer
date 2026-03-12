@@ -99,15 +99,15 @@ class WorldModel(nn.Module):
                 self.observed_step(observations[:, t], actions[:, t], recurrent_state)
             )
             reconstructed_observation = self.decoder(full_state)
-            predicted_reward = self.reward_predictor(full_state)
-            predicted_continue = self.continue_predictor(full_state)
+            predicted_reward_logits = self.reward_predictor(full_state)
+            predicted_continue_logits = self.continue_predictor(full_state)
             model_state["reconstructed_observations"].append(reconstructed_observation)
             model_state["full_states"].append(full_state)
             model_state["recurrent_states"].append(recurrent_state)
             model_state["posterior_log_probs"].append(posterior_logits)
             model_state["prior_log_probs"].append(prior_logits)
-            model_state["predicted_rewards"].append(predicted_reward)
-            model_state["predicted_continues"].append(predicted_continue)
+            model_state["predicted_rewards_logits"].append(predicted_reward_logits)
+            model_state["predicted_continues_logits"].append(predicted_continue_logits)
             recurrent_state = next_recurrent_state
 
         # stack all model outputs in sequence dimension
