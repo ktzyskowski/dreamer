@@ -115,6 +115,7 @@ class WorldModel(nn.Module):
             model_state[key] = torch.stack(model_state[key], dim=1)  # type: ignore
 
         # two-hot encode rewards for cross-entropy loss
+        # TODO: symlog the reward!
         model_state["rewards_twohot"] = self.twohot.encode(batch["rewards"])  # type: ignore
 
         return {**batch, **model_state}
@@ -125,10 +126,27 @@ class WorldModel(nn.Module):
         # batch is a dict with keys:
         # - "observations": tensor[batch, sequence, *observation_shape]
         observations = batch["observations"]
+        actions = batch["actions"]
         batch_size, sequence_length = observations.shape[0], observations.shape[1]
+
+        # iterate through each time step in sequence, each observation will
+        # serve as starting frame for dreamed rollout
         for t in range(sequence_length):
+            # initial recurrent state is zero
+            recurrent_state = torch.zeros(
+                (batch_size, self.recurrent_size), device=observations.device
+            )
+
+            # observe initial observation to create posterior state
+            full_state, recurrent_state, _, _ = self.observed_step(
+                observations[:, t], actions[:, t], recurrent_state
+            )
+
+            # swap to prior net, we're dreaming from here on out!
             for h in range(imagination_horizon):
-                pass
+                full_state, next_recurrent_state, prior_logits = self.imagined_step(
+                    actions[:, t], recurrent_state
+                )
 
     def observed_step(self, observation, action, recurrent_state):
         # extract posterior/prior from recurrent state and observation
