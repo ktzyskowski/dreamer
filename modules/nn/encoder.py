@@ -81,12 +81,15 @@ class Encoder(nn.Module):
             - embedding: (batch, sequence, output_dim) tensor of latent embeddings.
         """
         # merge batch and sequence dimensions for CNN processing: (batch * sequence, channel, height, width)
-        batch_size, sequence_length = observation.shape[0], observation.shape[1]
-        observation = observation.view(
-            batch_size * sequence_length, *self.observation_shape
-        )
+        input_shape = observation.shape
+        if input_shape > 3:
+            batch_size, sequence_length = input_shape[0], input_shape[1]
+            observation = observation.view(
+                batch_size * sequence_length, *self.observation_shape
+            )
         # compute embedding for each observation: (batch * sequence, output_dim)
         latent = self.cnn(observation)
         # un-merge batch and sequence dimensions: (batch, sequence, output_dim)
-        latent = latent.view(batch_size, sequence_length, self.output_dim)
+        if input_shape > 3:
+            latent = latent.view(batch_size, sequence_length, self.output_dim)
         return latent

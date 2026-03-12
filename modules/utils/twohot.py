@@ -30,11 +30,11 @@ class TwoHot:
         # clamp bin indices to [0, n_bins-2] to handle values which lie beyond edges
         k = k.clamp(0, self.n_bins - 2)
 
-        # interpolation weight for the upper bin
+        # bin weights
         upper_weight = torch.abs(bins[k] - y) / torch.abs(bins[k + 1] - bins[k])
         lower_weight = 1.0 - upper_weight
 
-        # scatter weights into one-hot-shaped tensor: (*, bins)
+        # scatter weights into new tensor with added bin dimension: (*, bins)
         # unsqueezes align dimensions: (*) -> (*, bins)
         twohot = torch.zeros(*y.shape, self.n_bins, device=y.device)
         twohot.scatter_(-1, k.unsqueeze(-1), lower_weight.unsqueeze(-1))

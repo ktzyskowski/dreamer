@@ -1,3 +1,5 @@
+from typing import Optional, Type
+
 from torch import nn
 
 
@@ -6,11 +8,11 @@ class MultiLayerPerceptron(nn.Module):
 
     def __init__(
         self,
-        input_dim,
-        hidden_dims,
-        output_dim,
-        activation=nn.ReLU,
-        output_activation=None,
+        input_dim: int,
+        hidden_dims: list[int],
+        output_dim: int,
+        activation: Type[nn.Module] = nn.ReLU,
+        output_activation: Optional[Type[nn.Module]] = None,
     ):
         """
         Args:
@@ -35,8 +37,8 @@ class MultiLayerPerceptron(nn.Module):
         if output_activation:
             layers.append(output_activation())
 
-        self.network = nn.Sequential(*layers)
+        self.net = nn.Sequential(*layers)
 
     def forward(self, x):
-        y = self.network(x)
+        y = self.net(x)
         return y

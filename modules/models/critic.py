@@ -1,7 +1,7 @@
 from torch import nn
 
 from modules.nn.mlp import MultiLayerPerceptron
-from modules.nn.twohot import TwoHot
+from modules.utils.twohot import TwoHot
 
 
 class Critic(nn.Module):

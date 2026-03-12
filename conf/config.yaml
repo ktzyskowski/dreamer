@@ -5,9 +5,38 @@ environment:
 replay_buffer:
   capacity: 10_000
 
-dreamer:
-  recurrent_dim: 128
-  latent_dim: 16
+world_model:
+  # Discrete latent state
+  n_categoricals: 16
+  n_classes: 16
+  # Recurrent state
+  recurrent_size: 64
+  # Internal neural networks:
+  # CNN
+  encoder:
+    kernel_size: 3
+    stride: 2
+    padding: 0
+  # MLP
+  posterior_net:
+    hidden_layers: [128, 128]
+  # MLP
+  prior_net:
+    hidden_layers: [128, 128]
+  # MLP
+  reward_predictor:
+    hidden_layers: [128, 128]
+  # MLP
+  continue_predictor:
+    hidden_layers: [128, 128]
+  # Block-diagonal GRU
+  recurrent_model:
+    n_blocks: 8
+
+twohot:
+  low: -20
+  high: 20
+  n_bins: 255
 
 # Replay ratio controls how many environment steps are taken in between
 # gradient updates. For example, a value of 32 (and action repeat of 4)

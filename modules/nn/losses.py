@@ -1,6 +1,6 @@
 from torch import nn
 
-from modules.nn.utils import deconstruct_batch
+from modules.nn.functions import deconstruct_batch
 
 
 class WorldModelLoss(nn.Module):

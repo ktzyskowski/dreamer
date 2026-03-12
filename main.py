@@ -36,7 +36,7 @@ def main(config: DictConfig):
         replay_buffer = ReplayBuffer(
             observation_shape=observation_space.shape,
             action_shape=action_space.shape,
-            recurrent_dim=128,
+            # recurrent_dim=128,
             capacity=config.replay_buffer.capacity,
         )
 

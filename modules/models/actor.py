@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from modules.nn.mlp import MultiLayerPerceptron
-from modules.nn.utils import mixin_uniform
+from modules.nn.functions import mixin_uniform
 
 
 class DiscreteActor(nn.Module):

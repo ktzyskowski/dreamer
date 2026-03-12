@@ -8,7 +8,7 @@ class ReplayBuffer:
         self,
         observation_shape,
         action_shape,
-        recurrent_dim,
+        # recurrent_dim,
         capacity,
         dtype=np.float32,
     ):
@@ -23,19 +23,19 @@ class ReplayBuffer:
         self.actions = np.zeros((capacity, *action_shape), dtype=dtype)
         self.rewards = np.zeros((capacity,), dtype=dtype)
         self.dones = np.zeros((capacity,), dtype=dtype)
-        self.recurrent_states = np.zeros((capacity, recurrent_dim), dtype=dtype)
+        # self.recurrent_states = np.zeros((capacity, recurrent_dim), dtype=dtype)
 
     def __len__(self):
         """Get the current number of transitions stored in the buffer."""
         return self.capacity if self.is_full else self.buffer_index
 
-    def add(self, observation, action, reward, done, recurrent_state):
+    def add(self, observation, action, reward, done):
         """Add a transition to the replay buffer, overwriting old transitions if capacity is exceeded."""
         self.observations[self.buffer_index] = observation
         self.actions[self.buffer_index] = action
         self.rewards[self.buffer_index] = reward
         self.dones[self.buffer_index] = done
-        self.recurrent_states[self.buffer_index] = recurrent_state
+        # self.recurrent_states[self.buffer_index] = recurrent_state
 
         # increment buffer index and wrap around if we exceed capacity, overwriting old transitions
         self.buffer_index = (self.buffer_index + 1) % self.capacity
@@ -106,18 +106,18 @@ class ReplayBuffer:
         batch_dones = np.array(
             [gather_sequence(self.dones, idx, sequence_length) for idx in start_indices]
         )
-        batch_recurrent_states = np.array(
-            [
-                gather_sequence(self.recurrent_states, idx, sequence_length)
-                for idx in start_indices
-            ]
-        )
+        # batch_recurrent_states = np.array(
+        #     [
+        #         gather_sequence(self.recurrent_states, idx, sequence_length)
+        #         for idx in start_indices
+        #     ]
+        # )
         return {
             "observations": batch_observations,
             "actions": batch_actions,
             "rewards": batch_rewards,
             "dones": batch_dones,
-            "recurrent_states": batch_recurrent_states,
+            # "recurrent_states": batch_recurrent_states,
         }
 
 
