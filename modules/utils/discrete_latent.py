@@ -22,6 +22,7 @@ class DiscreteLatent:
             logits = logits.reshape(*logits.shape[:-1], n_categoricals, n_classes)
 
         self.probs = logits.softmax(dim=-1)
+        self.log_probs = logits.log_softmax(dim=-1)
         self.dist = OneHotCategorical(logits=logits)
 
     def sample(self):
