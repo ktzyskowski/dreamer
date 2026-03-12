@@ -82,7 +82,7 @@ class Encoder(nn.Module):
         """
         # merge batch and sequence dimensions for CNN processing: (batch * sequence, channel, height, width)
         input_shape = observation.shape
-        if input_shape > 3:
+        if input_shape > 4:
             batch_size, sequence_length = input_shape[0], input_shape[1]
             observation = observation.view(
                 batch_size * sequence_length, *self.observation_shape
@@ -90,6 +90,6 @@ class Encoder(nn.Module):
         # compute embedding for each observation: (batch * sequence, output_dim)
         latent = self.cnn(observation)
         # un-merge batch and sequence dimensions: (batch, sequence, output_dim)
-        if input_shape > 3:
+        if input_shape > 4:
             latent = latent.view(batch_size, sequence_length, self.output_dim)
         return latent
