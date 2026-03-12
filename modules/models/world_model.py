@@ -1,11 +1,12 @@
 import torch
-from torch import Tensor, nn
+from torch import nn
 
 from modules.nn.decoder import Decoder
 from modules.utils.discrete_latent import DiscreteLatent
 from modules.nn.encoder import Encoder
 from modules.nn.mlp import MultiLayerPerceptron
 from modules.nn.rnn import BlockDiagonalGRU
+from modules.utils.twohot import TwoHot
 
 
 class WorldModel(nn.Module):
@@ -13,6 +14,11 @@ class WorldModel(nn.Module):
         super().__init__()
         self.recurrent_size = config.world_model.recurrent_size
         self.n_categoricals = config.world_model.n_categoricals
+        self.twohot = TwoHot(
+            config.world_model.twohot.low,
+            config.world_model.twohot.high,
+            config.world_model.twohot.n_bins,
+        )
         self.n_classes = config.world_model.n_classes
         latent_size = self.n_categoricals * self.n_classes
         full_state_size = latent_size + self.recurrent_size
@@ -74,11 +80,16 @@ class WorldModel(nn.Module):
             (batch_size, self.recurrent_size), device=observations.device
         )
 
+        # storing model outputs in a dictionary keeps things neat, we will
+        # combine with original batch dictionary when returning
         model_state = {
+            "reconstructed_observations": [],
             "full_states": [],
             "recurrent_states": [],
             "posterior_log_probs": [],
             "prior_log_probs": [],
+            "predicted_rewards": [],
+            "predicted_continues": [],
         }
 
         # iterate through each time step in sequence to collect recurrent states,
@@ -87,15 +98,24 @@ class WorldModel(nn.Module):
             full_state, next_recurrent_state, posterior_logits, prior_logits = (
                 self.observed_step(observations[:, t], actions[:, t], recurrent_state)
             )
+            reconstructed_observation = self.decoder(full_state)
+            predicted_reward = self.reward_predictor(full_state)
+            predicted_continue = self.continue_predictor(full_state)
+            model_state["reconstructed_observations"].append(reconstructed_observation)
             model_state["full_states"].append(full_state)
             model_state["recurrent_states"].append(recurrent_state)
             model_state["posterior_log_probs"].append(posterior_logits)
             model_state["prior_log_probs"].append(prior_logits)
+            model_state["predicted_rewards"].append(predicted_reward)
+            model_state["predicted_continues"].append(predicted_continue)
             recurrent_state = next_recurrent_state
 
         # stack all model outputs in sequence dimension
         for key in model_state.keys():
             model_state[key] = torch.stack(model_state[key], dim=1)  # type: ignore
+
+        # two-hot encode rewards for cross-entropy loss
+        model_state["rewards_twohot"] = self.twohot.encode(batch["rewards"])  # type: ignore
 
         return {**batch, **model_state}
 

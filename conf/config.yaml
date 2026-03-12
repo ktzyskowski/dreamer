@@ -9,8 +9,16 @@ world_model:
   # Discrete latent state
   n_categoricals: 16
   n_classes: 16
+
   # Recurrent state
   recurrent_size: 64
+
+  # Two-hot encoding
+  twohot:
+    low: -20
+    high: 20
+    n_bins: 255
+
   # Internal neural networks:
   # CNN
   encoder:
@@ -32,11 +40,6 @@ world_model:
   # Block-diagonal GRU
   recurrent_model:
     n_blocks: 8
-
-twohot:
-  low: -20
-  high: 20
-  n_bins: 255
 
 # Replay ratio controls how many environment steps are taken in between
 # gradient updates. For example, a value of 32 (and action repeat of 4)
