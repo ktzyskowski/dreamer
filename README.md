@@ -1,6 +1,6 @@
 # Mastering Diverse Domains through World Models
 
-> [📄 Paper Source](https://arxiv.org/pdf/2301.04104)
+[📄 Paper Source](https://arxiv.org/pdf/2301.04104)
 
 This repository contains my implementation of the DreamerV3 paper, which was introduced by Hafner et al. in their paper _Mastering Diverse Domains through World Models_.
 
