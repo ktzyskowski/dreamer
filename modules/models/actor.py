@@ -21,18 +21,9 @@ class DiscreteActor(nn.Module):
         )
 
     def forward(self, state):
-        """
-        Args:
-            state (model_state): full model state, including recurrent and discrete state vectors.
-        Returns:
-            probs (actions): softmax distribution over discrete actions.
-        """
+        """Calculate action probabilities, and sample an action, from the given full model state."""
         logits = self.net(state)
         probs = F.softmax(logits, -1)
         probs = mixin_uniform(probs, split=0.01, dim=-1)
-        return probs
-
-    def sample(self, state):
-        probs = self(state)
-        action = torch.multinomial(probs, 1).squeeze(-1)
-        return action
+        action = torch.distributions.OneHotCategorical(probs=probs).sample()
+        return action, probs

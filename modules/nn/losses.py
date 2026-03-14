@@ -17,9 +17,7 @@ class WorldModelLoss:
         self.free_nats = free_nats
 
     def calculate_kl_loss(self, input, target):
-        loss = torch.nn.functional.kl_div(
-            input, target=target, log_target=True, reduction="none"
-        )
+        loss = torch.nn.functional.kl_div(input, target=target, log_target=True, reduction="none")
         # sum KL over classes, per categorical
         loss = loss.sum(-1)
         # clip KL per categorical
@@ -49,7 +47,7 @@ class WorldModelLoss:
         self,
         observations,
         reconstructed_observations,
-        rewards_twohot,
+        rewards,
         predicted_reward_logits,
         dones,
         predicted_continue_logits,
@@ -57,15 +55,13 @@ class WorldModelLoss:
         observation_loss = F.mse_loss(observations, reconstructed_observations)
 
         continues = 1 - dones
-        continue_loss = F.binary_cross_entropy_with_logits(
-            predicted_continue_logits, continues
-        )
+        continue_loss = F.binary_cross_entropy_with_logits(predicted_continue_logits, continues)
 
         # permute: (batch, sequence, classes) -> (batch, classes, sequence)
         # because cross_entropy expects class dimension in 2nd position
         reward_loss = F.cross_entropy(
             predicted_reward_logits.permute(0, 2, 1),
-            rewards_twohot.permute(0, 2, 1),
+            rewards.permute(0, 2, 1),
         )
 
         loss = observation_loss + continue_loss + reward_loss
@@ -83,7 +79,7 @@ class WorldModelLoss:
         prediction_loss = self.calculate_prediction_loss(
             batch["observations"],
             batch["reconstructed_observations"],
-            batch["rewards_twohot"],
+            batch["rewards_symlog_two_hot"],
             batch["predicted_reward_logits"],
             batch["dones"],
             batch["predicted_continue_logits"],

@@ -1,5 +1,3 @@
-from typing import Optional
-
 import gymnasium as gym
 import numpy as np
 from gymnasium.wrappers import (
@@ -12,49 +10,56 @@ from gymnasium.wrappers.numpy_to_torch import NumpyToTorch
 
 
 class EnvironmentManager:
-    def __init__(self, action_repeat=1):
-        self.action_repeat = action_repeat
+    def __init__(self, config):
+        self.env_name = config.environment.name
+        self.env_observation_size = tuple(config.environment.resize_observation)
+        self.action_repeat = config.action_repeat
         self._env = None
-        self._observation_space: Optional[gym.Space] = None
-        self._action_space: Optional[gym.Space] = None
 
     @property
-    def env(self):
+    def env(self) -> gym.Env:
         if self._env is None:
             raise ValueError("Environment is not initialized")
         return self._env
 
     @property
-    def observation_space(self):
-        if self._observation_space is None:
-            raise ValueError("Environment is not initialized")
-        return self._observation_space
-
-    @property
-    def action_space(self):
-        if self._action_space is None:
-            raise ValueError("Environment is not initialized")
-        return self._action_space
+    def action_size(self) -> int:
+        action_space = self.env.action_space
+        if isinstance(action_space, gym.spaces.Discrete):
+            return int(action_space.n)
+        if isinstance(action_space, gym.spaces.Box):
+            return sum(action_space.shape)
+        raise ValueError("Unsupported action space.")
 
     def __enter__(self):
-        self._env = gym.make("CarRacing-v3")
-        self._observation_space = self._env.observation_space
-        self._action_space = self._env.action_space
+        if self.env_name.startswith("ALE/"):
+            import ale_py
 
-        # downsize images to (64, 64)
-        self._env = ResizeObservation(self._env, (64, 64))
+            gym.register_envs(ale_py)
+
+        self._env = gym.make(self.env_name)
+
+        # downsize images
+        self._env = ResizeObservation(self._env, self.env_observation_size)
+
         # change dtype from uint8 to float32 and downscale from 0,255 to 0,1
         self._env = DtypeObservation(self._env, dtype=np.float32)
-        self._env = RescaleObservation(
-            self._env, min_obs=np.float32(0.0), max_obs=np.float32(1.0)
+        self._env = RescaleObservation(self._env, min_obs=np.float32(0.0), max_obs=np.float32(1.0))
+
+        # CNN expects (channel, height, width), not (height, width, channel)
+        old_observation_space = self._env.observation_space
+        new_observation_space = gym.spaces.Box(
+            low=np.moveaxis(old_observation_space.low, -1, 0),
+            high=np.moveaxis(old_observation_space.high, -1, 0),
+            dtype=old_observation_space.dtype,
         )
-        # rearrange observation axes from (height, width, channel) to (channel, height, width)
-        # as expected by CNN layers
         self._env = TransformObservation(
             self._env,
             lambda observation: np.moveaxis(observation, -1, 0),
-            self._env.observation_space,
+            new_observation_space,
         )
+
+        # wrapping env in torch makes our lives easier, less manual conversions
         self._env = NumpyToTorch(self._env)
 
         return self
@@ -74,9 +79,7 @@ class EnvironmentManager:
         # repeat given action specified number of times, accumulate
         # rewards per step and discard intermediate observations.
         for _ in range(self.action_repeat):
-            observation, step_reward, step_done, step_truncated, _ = self.env.step(
-                action
-            )
+            observation, step_reward, step_done, step_truncated, _ = self.env.step(action)
 
             reward += float(step_reward)
 

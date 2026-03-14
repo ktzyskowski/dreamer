@@ -1,11 +1,13 @@
 environment:
-  name: "CarRacing-v3"
+  name: "ALE/Breakout-v5"
   resize_observation: [64, 64]
 
 replay_buffer:
   capacity: 10_000
 
 world_model:
+  dream_horizon: 16
+
   # Discrete latent state
   n_categoricals: 16
   n_classes: 16

@@ -14,14 +14,21 @@ def count_parameters(model: nn.Module) -> int:
     return n_parameters
 
 
-# TODO: do I need this function?
-def deconstruct_batch(batch):
-    observations = batch["observations"]
-    actions = batch["actions"]
-    rewards = batch["rewards"]
-    dones = batch["dones"]
-    recurrent_states = batch["recurrent_states"]
-    return observations, actions, rewards, dones, recurrent_states
+def get_device() -> str:
+    """Get the torch device to use for training.
+
+    Priority:
+
+    `cuda` >> `mps` >> `cpu`
+
+    Returns:
+        str: device
+    """
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 def mixin_uniform(probs: torch.Tensor, split=0.01, dim=-1) -> torch.Tensor:

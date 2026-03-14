@@ -36,11 +36,11 @@ class TwoHot:
 
         # scatter weights into new tensor with added bin dimension: (*, bins)
         # unsqueezes align dimensions: (*) -> (*, bins)
-        twohot = torch.zeros(*y.shape, self.n_bins, device=y.device)
-        twohot.scatter_(-1, k.unsqueeze(-1), lower_weight.unsqueeze(-1))
-        twohot.scatter_(-1, (k + 1).unsqueeze(-1), upper_weight.unsqueeze(-1))
+        two_hot = torch.zeros(*y.shape, self.n_bins, device=y.device)
+        two_hot.scatter_(-1, k.unsqueeze(-1), lower_weight.unsqueeze(-1))
+        two_hot.scatter_(-1, (k + 1).unsqueeze(-1), upper_weight.unsqueeze(-1))
 
-        return twohot
+        return two_hot
 
     def decode(self, logits):
         """

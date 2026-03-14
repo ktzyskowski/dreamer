@@ -1,3 +1,5 @@
+import logging
+
 from torch import nn
 
 
@@ -15,7 +17,7 @@ class Encoder(nn.Module):
     def __init__(
         self,
         observation_shape: tuple,
-        output_dim: int,
+        output_size: int,
         kernel_size: int,
         stride: int,
         padding: int,
@@ -23,7 +25,7 @@ class Encoder(nn.Module):
     ):
         super().__init__()
         self.observation_shape = observation_shape
-        self.output_dim = output_dim
+        self.output_size = output_size
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
@@ -68,28 +70,13 @@ class Encoder(nn.Module):
             ),
             activation(),
             nn.Flatten(),
-            nn.Linear(256 * h * w, output_dim),
+            nn.Linear(256 * h * w, output_size),
         )
 
     def forward(self, observation):
-        """Encode an image observation.
-
-        Args:
-            - observation: (batch, sequence, channel, height, width) tensor of observations.
-
-        Returns:
-            - embedding: (batch, sequence, output_dim) tensor of latent embeddings.
-        """
-        # merge batch and sequence dimensions for CNN processing: (batch * sequence, channel, height, width)
         input_shape = observation.shape
-        if input_shape > 4:
-            batch_size, sequence_length = input_shape[0], input_shape[1]
-            observation = observation.view(
-                batch_size * sequence_length, *self.observation_shape
-            )
-        # compute embedding for each observation: (batch * sequence, output_dim)
-        latent = self.cnn(observation)
-        # un-merge batch and sequence dimensions: (batch, sequence, output_dim)
-        if input_shape > 4:
-            latent = latent.view(batch_size, sequence_length, self.output_dim)
-        return latent
+        # flatten all leading dims into a single batch dim for CNN processing
+        observation = observation.view(-1, *self.observation_shape[-3:])
+        encoding = self.cnn(observation)
+        # restore original leading dims, replacing (C, H, W) with (output_size,)
+        return encoding.view(*input_shape[:-3], self.output_size)
