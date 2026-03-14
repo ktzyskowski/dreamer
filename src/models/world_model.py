@@ -1,13 +1,13 @@
 import torch
 from torch import nn
 
-from modules.nn.decoder import Decoder
-from modules.utils.discrete_latent import DiscreteLatent
-from modules.nn.encoder import Encoder
-from modules.nn.mlp import MultiLayerPerceptron
-from modules.nn.rnn import BlockDiagonalGRU
-from modules.nn.functions import symlog
-from modules.utils.two_hot import TwoHot
+from src.nn.decoder import Decoder
+from src.nn.discrete_latent import DiscreteLatent
+from src.nn.encoder import Encoder
+from src.nn.mlp import MultiLayerPerceptron
+from src.nn.rnn import BlockDiagonalGRU
+from src.nn.functions import symlog
+from src.nn.two_hot import TwoHot
 
 
 def _condense_rollouts(list_of_rollouts):

@@ -4,11 +4,11 @@ import hydra
 from omegaconf import DictConfig
 import torch
 
-from modules.models.actor import DiscreteActor
-from modules.models.world_model import WorldModel
-from modules.nn.functions import count_parameters, get_device
-from modules.utils.buffer import ReplayBuffer
-from modules.utils.env import EnvironmentManager
+from src.models.actor import DiscreteActor
+from src.models.world_model import WorldModel
+from src.nn.functions import count_parameters, get_device
+from src.buffer import ReplayBuffer
+from src.env import EnvironmentManager
 
 
 @hydra.main(
