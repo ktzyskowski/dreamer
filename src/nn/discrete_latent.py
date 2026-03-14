@@ -1,5 +1,5 @@
 from torch import Tensor
-from torch.distributions import OneHotCategorical, OneHotCategoricalStraightThrough
+from torch.distributions import OneHotCategoricalStraightThrough
 
 
 class DiscreteLatent:
