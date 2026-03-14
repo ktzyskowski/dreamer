@@ -14,21 +14,25 @@ def count_parameters(model: nn.Module) -> int:
     return n_parameters
 
 
-def get_device() -> str:
+def get_device(priority: str = None) -> str:
     """Get the torch device to use for training.
 
     Priority:
 
-    `cuda` >> `mps` >> `cpu`
+    `priority` >> `cuda` >> `mps` >> `cpu`
 
     Returns:
         str: device
     """
-    if torch.cuda.is_available():
-        return "cuda"
+    devices = ["cpu"]
     if torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
+        devices.append("mps")
+    if torch.cuda.is_available():
+        devices.append("cuda")
+    if priority and priority in devices:
+        return priority
+    else:
+        return devices[-1]
 
 
 def mixin_uniform(probs: torch.Tensor, split=0.01, dim=-1) -> torch.Tensor:

@@ -2,6 +2,7 @@ environment:
   name: "ALE/Breakout-v5"
   resize_observation: [64, 64]
 
+device: "cuda"
 replay_buffer:
   capacity: 10_000
 
