@@ -14,11 +14,17 @@ class DiscreteActor(nn.Module):
             action_dim (int): number of actions to select.
         """
         super().__init__()
+        self.action_size = action_dim
         self.net = MultiLayerPerceptron(
             input_dim=input_dim,
             hidden_dims=hidden_dims,
             output_dim=action_dim,
         )
+
+    @property
+    def device(self):
+        device = next(self.parameters()).device
+        return device
 
     def forward(self, state):
         """Calculate action probabilities, and sample an action, from the given full model state."""

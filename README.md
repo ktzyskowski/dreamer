@@ -21,5 +21,5 @@ Currently, the code only works on my Windows PC. I suspect it has something to d
 Although the pipeline is non-existant at this point in the project, to run the main script you can run this command:
 
 ```zsh
-uv run main.py
+uv run main.py --config-name=config
 ```

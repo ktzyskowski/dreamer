@@ -1,5 +1,5 @@
 from torch import Tensor
-from torch.distributions import OneHotCategorical
+from torch.distributions import OneHotCategorical, OneHotCategoricalStraightThrough
 
 
 class DiscreteLatent:
@@ -23,7 +23,7 @@ class DiscreteLatent:
 
         self.probs = logits.softmax(dim=-1)
         self.log_probs = logits.log_softmax(dim=-1)
-        self.dist = OneHotCategorical(logits=logits)
+        self.dist = OneHotCategoricalStraightThrough(logits=logits)
 
     def sample(self):
         """Sample a discrete state from the logits.
@@ -34,10 +34,6 @@ class DiscreteLatent:
             state (*, n_categoricals * n_classes)
         """
         state = self.dist.sample()
-        # straight-through gradient trick:
-        # adding and subtracting the probabilities has no immediate effect to
-        # the sampled one-hot values, but adds the gradients into the computation graph
-        state = state + self.probs - self.probs.detach()
         # flatten into single (n_categoricals * n_classes) dimension
         state = state.reshape(*state.shape[:-2], self.n_categoricals * self.n_classes)
         return state

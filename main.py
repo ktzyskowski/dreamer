@@ -4,6 +4,7 @@ import hydra
 from omegaconf import DictConfig
 import torch
 
+from modules.models.actor import DiscreteActor
 from modules.models.world_model import WorldModel
 from modules.nn.functions import count_parameters, get_device
 from modules.utils.buffer import ReplayBuffer
@@ -20,62 +21,93 @@ def main(config: DictConfig):
     logging.basicConfig()
 
     # context manager automatically handles environment during training
-    with EnvironmentManager(config) as env_manager:
-        env = env_manager.env
+    with EnvironmentManager(config) as env:
 
         # log observation/action space information
         observation_shape = env.observation_space.shape
-        action_size = env_manager.action_size
+        action_size = env.action_size
         logging.info("Observation space: %s", str(observation_shape))
         logging.info("Action size: %d", action_size)
 
         device = get_device()
         logging.info("Using device: %s", device)
 
-        world_model = WorldModel(observation_shape=observation_shape, action_size=action_size, config=config)
-        n_parameters = count_parameters(world_model)
-        logging.info("World model # parameters: %d", n_parameters)
+        # world model
+        world_model = WorldModel(
+            observation_shape=observation_shape,
+            action_size=action_size,
+            config=config,
+        ).to(device)
+        logging.info("World model # parameters: %d", count_parameters(world_model))
+
+        # actor
+        actor = DiscreteActor(
+            input_dim=world_model.full_state_size,
+            hidden_dims=[128, 128],
+            action_dim=action_size,
+        ).to(device)
+        logging.info("Actor # parameters: %d", count_parameters(actor))
 
         # replay buffer will hold actual experience collected from environment
         replay_buffer = ReplayBuffer(
             observation_shape=observation_shape,
             action_shape=[action_size],
-            # recurrent_dim=128,
             capacity=config.replay_buffer.capacity,
         )
 
-        observation, _ = env.reset()
+        # observation = env.reset()
+        # observation, reward, done = env.step(torch.tensor(2))
 
-        action = torch.nn.functional.one_hot(torch.tensor(3), num_classes=action_size)
+        # action = torch.nn.functional.one_hot(torch.tensor(3), num_classes=action_size)
 
-        logging.info("Example observation: %s", observation.shape)
-        full_state, recurrent_state, posterior_log_probs, prior_log_probs = world_model.observed_step(
-            observation, action
+        # logging.info("Example observation: %s", observation.shape)
+        # full_state, recurrent_state, posterior_log_probs, prior_log_probs = world_model.observed_step(
+        #     observation, action
+        # )
+        # logging.info("Full state shape %s", full_state.shape)
+        # logging.info("Recurrent state shape %s", recurrent_state.shape)
+        # logging.info("Posterior shape %s", posterior_log_probs.shape)
+        # logging.info("Prior shape %s", prior_log_probs.shape)
+
+        collect_experience(
+            actor,
+            world_model,
+            env,
+            replay_buffer,
+            n_steps=256,
         )
-        logging.info("Full state shape %s", full_state.shape)
-        logging.info("Recurrent state shape %s", recurrent_state.shape)
-        logging.info("Posterior shape %s", posterior_log_probs.shape)
-        logging.info("Prior shape %s", prior_log_probs.shape)
 
-        # for _ in range(100):
-        #     # 1. collect experience
-        #     for _ in range(config.replay_ratio):
-        #         model_state = world_model.encode(observation, recurrent_state, no_grad=True)
-        #         action = actor(model_state, no_grad=True)
+        # 1. collect experience into replay buffer
 
-        #         # take sampled action in environment, observe next observation and reward
-        #         next_observation, reward, done = env.step(action)
+        # 2. sample experience from replay buffer
 
-        #         # add experience to replay buffer
-        #         replay_buffer.add(observation, action, reward, done, recurrent_state)
+        # 3. train world model
 
-        #         if done:
-        #             observation = env.reset()
-        #         else:
-        #             observation = next_observation
+        # 4. train actor/critic
 
-        #     # 2. perform gradient update step
-        #     batch = replay_buffer.sample(config.batch_size, config.sequence_length)
+
+@torch.no_grad()
+def collect_experience(actor, world_model, env, replay_buffer, n_steps: int = 256):
+    assert actor.device == world_model.device, "Actor and world model are on different devices."
+    device = actor.device
+
+    recurrent_state = torch.zeros(world_model.recurrent_size, device=device)
+    observation = env.reset()
+
+    for _ in range(n_steps):
+        full_state = world_model.get_full_state(observation.to(device), recurrent_state)
+        action, _ = actor(full_state)
+        action_idx = action.argmax(dim=-1).cpu().item()
+
+        next_observation, reward, done = env.step(action_idx)
+        replay_buffer.add(observation, action, reward, done)
+
+        if done:
+            recurrent_state = torch.zeros(world_model.recurrent_size, device=device)
+            observation, _ = env.reset()
+        else:
+            recurrent_state = world_model.get_next_recurrent_state(full_state, action, recurrent_state)
+            observation = next_observation
 
 
 if __name__ == "__main__":

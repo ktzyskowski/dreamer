@@ -17,14 +17,20 @@ class EnvironmentManager:
         self._env = None
 
     @property
-    def env(self) -> gym.Env:
+    def observation_space(self) -> gym.Space:
         if self._env is None:
             raise ValueError("Environment is not initialized")
-        return self._env
+        return self._env.observation_space
+
+    @property
+    def action_space(self) -> gym.Space:
+        if self._env is None:
+            raise ValueError("Environment is not initialized")
+        return self._env.action_space
 
     @property
     def action_size(self) -> int:
-        action_space = self.env.action_space
+        action_space = self._env.action_space
         if isinstance(action_space, gym.spaces.Discrete):
             return int(action_space.n)
         if isinstance(action_space, gym.spaces.Box):
@@ -68,10 +74,11 @@ class EnvironmentManager:
         if self._env:
             self._env.close()
             self._env = None
-            self._observation_space = None
-            self._action_space = None
 
     def step(self, action):
+        if self._env is None:
+            raise ValueError("Environment is not initialized")
+
         observation = None
         reward = 0.0
         done = False
@@ -79,7 +86,7 @@ class EnvironmentManager:
         # repeat given action specified number of times, accumulate
         # rewards per step and discard intermediate observations.
         for _ in range(self.action_repeat):
-            observation, step_reward, step_done, step_truncated, _ = self.env.step(action)
+            observation, step_reward, step_done, step_truncated, _ = self._env.step(action)
 
             reward += float(step_reward)
 
@@ -90,5 +97,8 @@ class EnvironmentManager:
         return observation, reward, done
 
     def reset(self):
-        observation, _ = self.env.reset()
+        if self._env is None:
+            raise ValueError("Environment is not initialized")
+
+        observation, _ = self._env.reset()
         return observation
