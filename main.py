@@ -1,22 +1,18 @@
 import logging
 
 import hydra
-from omegaconf import DictConfig
-import torch
+from omegaconf import DictConfig, OmegaConf
 
+from src.models.critic import Critic
 from src.models.actor import DiscreteActor
-from src.models.world_model import WorldModel
-from src.nn.functions import count_parameters, get_device
+
+# from src.models.world_model import WorldModel
+from src.nets.functions import count_parameters
 from src.buffer import ReplayBuffer
 from src.env import EnvironmentManager
-from src.trainer import Trainer
 
 
-@hydra.main(
-    version_base=None,
-    config_path="conf",
-    config_name="config",
-)
+@hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(config: DictConfig):
     # set up logging
     logging.basicConfig()
@@ -26,35 +22,16 @@ def main(config: DictConfig):
         observation_shape = env.observation_space.shape
         action_size = env.action_size
 
-        replay_buffer = ReplayBuffer(
-            observation_shape=observation_shape,
-            action_shape=(action_size,),
-            capacity=config.replay_buffer.capacity,
-        )
-
-        world_model = WorldModel(
-            observation_shape=observation_shape,
-            action_size=action_size,
-            config=config,
-        )
-        logging.info("World model # parameters: %d", count_parameters(world_model))
-        actor = DiscreteActor(
-            input_dim=world_model.full_state_size,
-            hidden_dims=[128, 128],
-            action_dim=action_size,
-        )
+        replay_buffer = ReplayBuffer(observation_shape, action_size, config)
+        # world_model = WorldModel(observation_shape, action_size, config=config.world_model)
+        actor = DiscreteActor(320, action_size, config)
+        critic = Critic(320, config)
+        # logging.info("World model # parameters: %d", count_parameters(world_model))
         logging.info("Actor # parameters: %d", count_parameters(actor))
+        logging.info("Critic # parameters: %d", count_parameters(critic))
 
-        trainer = Trainer(world_model, actor, replay_buffer, config)
-
-        # 1. collect experience into replay buffer
-        trainer.collect_experience(env)
-
-        # 2. sample experience from replay buffer
-
-        # 3. train world model
-
-        # 4. train actor/critic
+    # trainer = Trainer(world_model, actor, replay_buffer, config)
+    # trainer.train(env, n_steps=256)
 
 
 if __name__ == "__main__":

@@ -1,24 +1,20 @@
+from omegaconf import DictConfig
 import torch
 import torch.nn.functional as F
 from torch import nn
 
-from src.nn.mlp import MultiLayerPerceptron
-from src.nn.functions import mixin_uniform
+from src.nets.mlp import MultiLayerPerceptron
+from src.nets.functions import mixin_uniform
 
 
 class DiscreteActor(nn.Module):
-    def __init__(self, input_dim, hidden_dims, action_dim):
-        """
-        Args:
-            input_dim (int): model state dimension, recurrent + latent.
-            action_dim (int): number of actions to select.
-        """
+    def __init__(self, input_size: int, output_size: int, config: DictConfig):
         super().__init__()
-        self.action_size = action_dim
+        self.action_size = output_size
         self.net = MultiLayerPerceptron(
-            input_dim=input_dim,
-            hidden_dims=hidden_dims,
-            output_dim=action_dim,
+            input_dim=input_size,
+            hidden_dims=tuple(config.actor.hidden_dims),
+            output_dim=output_size,
         )
 
     @property

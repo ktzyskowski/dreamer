@@ -1,4 +1,5 @@
 import numpy as np
+from omegaconf import DictConfig
 import torch
 
 
@@ -7,24 +8,22 @@ class ReplayBuffer:
 
     def __init__(
         self,
-        observation_shape,
-        action_shape,
-        # recurrent_dim,
-        capacity,
-        dtype=np.float32,
+        observation_shape: tuple,
+        action_size: int,
+        config: DictConfig,
     ):
-        if capacity <= 0:
+        if config.replay_buffer.capacity <= 0:
             raise ValueError("Replay buffer capacity must be greater than zero.")
 
-        self.capacity = capacity
+        self.capacity = config.replay_buffer.capacity
         self.is_full = False
         self.buffer_index = 0  # pointer to the next index to insert a transition
         # internal buffer arrays to store transitions
-        self.observations = np.zeros((capacity, *observation_shape), dtype=dtype)
-        self.actions = np.zeros((capacity, *action_shape), dtype=dtype)
-        self.rewards = np.zeros((capacity,), dtype=dtype)
-        self.dones = np.zeros((capacity,), dtype=dtype)
-        # self.recurrent_states = np.zeros((capacity, recurrent_dim), dtype=dtype)
+        dtype = np.dtype(config.replay_buffer.dtype)
+        self.observations = np.zeros((self.capacity, *observation_shape), dtype=dtype)
+        self.actions = np.zeros((self.capacity, action_size), dtype=dtype)
+        self.rewards = np.zeros((self.capacity,), dtype=dtype)
+        self.dones = np.zeros((self.capacity,), dtype=dtype)
 
     def __len__(self):
         """Get the current number of transitions stored in the buffer."""
@@ -41,7 +40,6 @@ class ReplayBuffer:
         self.actions[self.buffer_index] = action
         self.rewards[self.buffer_index] = reward
         self.dones[self.buffer_index] = done
-        # self.recurrent_states[self.buffer_index] = recurrent_state
 
         # increment buffer index and wrap around if we exceed capacity, overwriting old transitions
         self.buffer_index = (self.buffer_index + 1) % self.capacity
@@ -85,18 +83,11 @@ class ReplayBuffer:
         batch_actions = np.array([gather_sequence(self.actions, idx, sequence_length) for idx in start_indices])
         batch_rewards = np.array([gather_sequence(self.rewards, idx, sequence_length) for idx in start_indices])
         batch_dones = np.array([gather_sequence(self.dones, idx, sequence_length) for idx in start_indices])
-        # batch_recurrent_states = np.array(
-        #     [
-        #         gather_sequence(self.recurrent_states, idx, sequence_length)
-        #         for idx in start_indices
-        #     ]
-        # )
         return {
             "observations": batch_observations,
             "actions": batch_actions,
             "rewards": batch_rewards,
             "dones": batch_dones,
-            # "recurrent_states": batch_recurrent_states,
         }
 
 

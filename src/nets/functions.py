@@ -45,7 +45,7 @@ def mixin_uniform(probs: torch.Tensor, split=0.01, dim=-1) -> torch.Tensor:
 
     Args:
         probs (*): the tensor of probabilities.
-        split (float): percentage assigned to . Defaults to 0.01.
+        split (float): percentage assigned to uniform distribution. Defaults to 0.01.
         dim (int): tensor probability dimension. Defaults to -1, i.e. last dimension.
 
     Returns:

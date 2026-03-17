@@ -7,13 +7,14 @@ from gymnasium.wrappers import (
     TransformObservation,
 )
 from gymnasium.wrappers.numpy_to_torch import NumpyToTorch
+from omegaconf import DictConfig
 
 
 class EnvironmentManager:
-    def __init__(self, config):
-        self.env_name = config.environment.name
-        self.env_observation_size = tuple(config.environment.resize_observation)
-        self.action_repeat = config.action_repeat
+    def __init__(self, config: DictConfig):
+        self.name = config.environment.name
+        self.action_repeat = config.environment.action_repeat
+        self.obs_shape = (config.environment.obs_height, config.environment.obs_width)
         self._env = None
 
     @property
@@ -30,23 +31,22 @@ class EnvironmentManager:
 
     @property
     def action_size(self) -> int:
-        action_space = self._env.action_space
-        if isinstance(action_space, gym.spaces.Discrete):
-            return int(action_space.n)
-        if isinstance(action_space, gym.spaces.Box):
-            return sum(action_space.shape)
+        if isinstance(self.action_space, gym.spaces.Discrete):
+            return int(self.action_space.n)
+        if isinstance(self.action_space, gym.spaces.Box):
+            return sum(self.action_space.shape)
         raise ValueError("Unsupported action space.")
 
     def __enter__(self):
-        if self.env_name.startswith("ALE/"):
+        if self.name.startswith("ALE/"):
             import ale_py
 
             gym.register_envs(ale_py)
 
-        self._env = gym.make(self.env_name)
+        self._env = gym.make(self.name)
 
         # downsize images
-        self._env = ResizeObservation(self._env, self.env_observation_size)
+        self._env = ResizeObservation(self._env, self.obs_shape)
 
         # change dtype from uint8 to float32 and downscale from 0,255 to 0,1
         self._env = DtypeObservation(self._env, dtype=np.float32)

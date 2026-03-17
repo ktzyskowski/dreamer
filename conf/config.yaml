@@ -1,67 +1,113 @@
 environment:
-  name: "ALE/Breakout-v5"
-  resize_observation: [64, 64]
+  name: ALE/Breakout-v5
+  action_repeat: 1
+  # resize observations
+  obs_width: 64
+  obs_height: 64
 
-device: "cuda"
+two_hot:
+  n_bins: 255
+  low: -20
+  high: 20
+
 replay_buffer:
   capacity: 10_000
+  # capacity: 5_000_000
+  dtype: float32
 
 world_model:
-  dream_horizon: 16
 
-  # Discrete latent state
-  n_categoricals: 16
-  n_classes: 16
+actor:
+  hidden_dims: [128, 128]
 
-  # Recurrent state
-  recurrent_size: 64
+critic:
+  hidden_dims: [128, 128]
 
-  # Two-hot encoding
-  twohot:
-    low: -20
-    high: 20
-    n_bins: 255
+# ============================== #
+# ============================== #
+# ============================== #
+# ============================== #
+# ============================== #
+# ============================== #
+# ============================== #
+# ============================== #
 
-  # Internal neural networks:
-  # CNN
-  encoder:
-    kernel_size: 3
-    stride: 2
-    padding: 0
-  # MLP
-  posterior_net:
-    hidden_layers: [128, 128]
-  # MLP
-  prior_net:
-    hidden_layers: [128, 128]
-  # MLP
-  reward_predictor:
-    hidden_layers: [128, 128]
-  # MLP
-  continue_predictor:
-    hidden_layers: [128, 128]
-  # Block-diagonal GRU
-  recurrent_model:
-    n_blocks: 8
+# environment:
+#   name: "ALE/Breakout-v5"
+#   resize_observation: [64, 64]
 
-# Replay ratio controls how many environment steps are taken in between
-# gradient updates. For example, a value of 32 (and action repeat of 4)
-# indicates that 32x4=128 env steps are taken (and stored in the replay
-# buffer) before another gradient update step is taken.
-replay_ratio: 32
+# training:
+#   world_model_lr: 1e-4
+#   actor_lr: 3e-5
+#   gamma: 0.997
+#   entropy_coef: 3e-4
 
-# Action repeat controls how many times an action is repeated until an
-# observation is returned. Useful if the environment has high frame rate
-# (similar to "holding" a button down through N frames). The intermediate
-# frames are discarded, only the last is kept. Reward is summed.
-# Action repeat of 1 means no repeat occurs.
-action_repeat: 1
+# device: "cuda"
+# replay_buffer:
+#   capacity: 10_000
 
-# Batch size controls the number of transition sequences sampled from
-# the replay buffer during one gradient update step.
-batch_size: 16
+# world_model:
+#   dream_horizon: 16
 
-# Sequence length controls the length of each transition sequence sampled
-# in a batch. Combined, both contribute to total number of env steps used
-# during one gradient update.
-sequence_length: 64
+#   # Discrete latent state
+#   n_categoricals: 16
+#   n_classes: 16
+
+#   # Recurrent state
+#   recurrent_size: 64
+
+#   # Two-hot encoding
+#   twohot:
+#     low: -20
+#     high: 20
+#     n_bins: 255
+
+#   # Internal neural networks:
+#   # CNN
+#   encoder:
+#     kernel_size: 3
+#     stride: 2
+#     padding: 0
+#   # MLP
+#   posterior_net:
+#     hidden_layers: [128, 128]
+#   # MLP
+#   prior_net:
+#     hidden_layers: [128, 128]
+#   # MLP
+#   reward_predictor:
+#     hidden_layers: [128, 128]
+#   # MLP
+#   continue_predictor:
+#     hidden_layers: [128, 128]
+#   # Block-diagonal GRU
+#   recurrent_model:
+#     n_blocks: 8
+
+# # Warmup steps controls how many initial environment steps are taken
+# # before any gradient steps are made. This is done to ensure that the
+# # replay buffer contains enough data to sample from early in training,
+# # before it is too full.
+# warmup_steps: 1_024
+
+# # Replay ratio controls how many environment steps are taken in between
+# # gradient updates. For example, a value of 32 (and action repeat of 4)
+# # indicates that 32x4=128 env steps are taken (and stored in the replay
+# # buffer) before another gradient update step is taken.
+# replay_ratio: 32
+
+# # Action repeat controls how many times an action is repeated until an
+# # observation is returned. Useful if the environment has high frame rate
+# # (similar to "holding" a button down through N frames). The intermediate
+# # frames are discarded, only the last is kept. Reward is summed.
+# # Action repeat of 1 means no repeat occurs.
+# action_repeat: 1
+
+# # Batch size controls the number of transition sequences sampled from
+# # the replay buffer during one gradient update step.
+# batch_size: 16
+
+# # Sequence length controls the length of each transition sequence sampled
+# # in a batch. Combined, both contribute to total number of env steps used
+# # during one gradient update.
+# sequence_length: 64

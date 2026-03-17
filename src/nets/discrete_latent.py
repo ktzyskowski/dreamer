@@ -1,6 +1,8 @@
 from torch import Tensor
 from torch.distributions import OneHotCategoricalStraightThrough
 
+from nets.functions import mixin_uniform
+
 
 class DiscreteLatent:
     """Discrete/categorical latent state class."""
@@ -22,8 +24,9 @@ class DiscreteLatent:
             logits = logits.reshape(*logits.shape[:-1], n_categoricals, n_classes)
 
         self.probs = logits.softmax(dim=-1)
-        self.log_probs = logits.log_softmax(dim=-1)
-        self.dist = OneHotCategoricalStraightThrough(logits=logits)
+        self.probs = mixin_uniform(self.probs)  # encourages well-behaved KL loss
+        self.log_probs = self.probs.log()
+        self.dist = OneHotCategoricalStraightThrough(probs=self.probs)
 
     def sample(self):
         """Sample a discrete state from the logits.
