@@ -1,3 +1,7 @@
+device: cuda
+warmup_steps: 1_024
+replay_ratio: 32
+
 environment:
   name: ALE/Breakout-v5
   action_repeat: 1
@@ -15,13 +19,48 @@ replay_buffer:
   # capacity: 5_000_000
   dtype: float32
 
+# Models ========================================================== #
+
 world_model:
+  learning_rate: 3e-4
+  dream_horizon: 15
+  recurrent_size: 128
+  n_categoricals: 32
+  n_classes: 32
+
+  encoder:
+    kernel_size: 3
+    stride: 2
+    padding: 0
+  posterior_net:
+    hidden_dims: [128, 128]
+  prior_net:
+    hidden_dims: [128, 128]
+  reward_predictor:
+    hidden_dims: [128, 128]
+  continue_predictor:
+    hidden_dims: [128, 128]
+  recurrent_model:
+    n_blocks: 8
 
 actor:
+  learning_rate: 3e-4
   hidden_dims: [128, 128]
 
 critic:
+  learning_rate: 3e-4
   hidden_dims: [128, 128]
+
+# Loss Functions ================================================== #
+
+world_model_loss:
+  beta_posterior: 0.1
+  beta_prior: 1.0
+  beta_prediction: 1.0
+  free_nats: 1.0
+
+actor_loss:
+  gamma:
 
 # ============================== #
 # ============================== #

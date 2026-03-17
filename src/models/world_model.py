@@ -2,12 +2,12 @@ import torch
 from torch import nn
 
 from src.nets.decoder import Decoder
-from src.nets.discrete_latent import DiscreteLatent
+from src.util.multi_categorical import MultiCategorical
 from src.nets.encoder import Encoder
 from src.nets.mlp import MultiLayerPerceptron
 from src.nets.rnn import BlockDiagonalGRU
-from src.nets.functions import symlog
-from src.nets.two_hot import TwoHot
+from src.util.functions import symlog
+from src.util.two_hot import TwoHot
 
 
 def _condense_rollouts(list_of_rollouts):
@@ -34,9 +34,9 @@ class WorldModel(nn.Module):
         self.latent_size = self.n_categoricals * self.n_classes
         self.full_state_size = self.latent_size + self.recurrent_size
         self.two_hot = TwoHot(
-            config.world_model.twohot.low,
-            config.world_model.twohot.high,
-            config.world_model.twohot.n_bins,
+            config.two_hot.low,
+            config.two_hot.high,
+            config.two_hot.n_bins,
         )
         self.encoder = Encoder(
             observation_shape=observation_shape,
@@ -54,22 +54,22 @@ class WorldModel(nn.Module):
         )
         self.posterior_net = MultiLayerPerceptron(
             input_dim=self.full_state_size,
-            hidden_dims=config.world_model.posterior_net.hidden_layers,
+            hidden_dims=config.world_model.posterior_net.hidden_dims,
             output_dim=self.latent_size,
         )
         self.prior_net = MultiLayerPerceptron(
             input_dim=self.recurrent_size,
-            hidden_dims=config.world_model.prior_net.hidden_layers,
+            hidden_dims=config.world_model.prior_net.hidden_dims,
             output_dim=self.latent_size,
         )
         self.reward_predictor = MultiLayerPerceptron(
             input_dim=self.full_state_size,
-            hidden_dims=config.world_model.reward_predictor.hidden_layers,
-            output_dim=config.world_model.twohot.n_bins,
+            hidden_dims=config.world_model.reward_predictor.hidden_dims,
+            output_dim=config.two_hot.n_bins,
         )
         self.continue_predictor = MultiLayerPerceptron(
             input_dim=self.full_state_size,
-            hidden_dims=config.world_model.continue_predictor.hidden_layers,
+            hidden_dims=config.world_model.continue_predictor.hidden_dims,
             output_dim=1,
         )
         self.recurrent_model = BlockDiagonalGRU(
@@ -89,7 +89,7 @@ class WorldModel(nn.Module):
         return device
 
     def get_full_state(self, observation, recurrent_state):
-        posterior = DiscreteLatent(
+        posterior = MultiCategorical(
             logits=self.posterior_net(torch.cat([recurrent_state, self.encoder(observation)], dim=-1)),
             n_categoricals=self.n_categoricals,
             n_classes=self.n_classes,
@@ -182,12 +182,12 @@ class WorldModel(nn.Module):
 
         if recurrent_state is None:
             recurrent_state = torch.zeros(*observation.shape[:-3], self.recurrent_size, device=observation.device)
-        posterior = DiscreteLatent(
+        posterior = MultiCategorical(
             logits=self.posterior_net(torch.cat([recurrent_state, self.encoder(observation)], dim=-1)),
             n_categoricals=self.n_categoricals,
             n_classes=self.n_classes,
         )
-        prior = DiscreteLatent(
+        prior = MultiCategorical(
             logits=self.prior_net(recurrent_state),
             n_categoricals=self.n_categoricals,
             n_classes=self.n_classes,
@@ -244,7 +244,7 @@ class WorldModel(nn.Module):
         # recurrent_state:  (batch, recurrent_size)
 
         # pass initial observation through posterior net to get first full state
-        posterior = DiscreteLatent(
+        posterior = MultiCategorical(
             logits=self.posterior_net(torch.cat([recurrent_state, self.encoder(observation)], dim=-1)),
             n_categoricals=self.n_categoricals,
             n_classes=self.n_classes,
@@ -295,7 +295,7 @@ class WorldModel(nn.Module):
         # action:               (*, action_size)
         # recurrent_state:      (*, recurrent_size)
 
-        prior = DiscreteLatent(
+        prior = MultiCategorical(
             logits=self.prior_net(recurrent_state),
             n_categoricals=self.n_categoricals,
             n_classes=self.n_classes,

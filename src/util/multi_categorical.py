@@ -1,20 +1,21 @@
 from torch import Tensor
 from torch.distributions import OneHotCategoricalStraightThrough
 
-from nets.functions import mixin_uniform
+from src.util.functions import mixin_uniform
 
 
-class DiscreteLatent:
-    """Discrete/categorical latent state class."""
+class MultiCategorical:
+    """Multi-Categorical distribution."""
 
-    def __init__(self, logits: Tensor, n_categoricals: int, n_classes: int):
-        """Construct a new discrete latent state distribution.
+    def __init__(self, logits: Tensor, n_categoricals: int, n_classes: int, unimix: float = 0.01):
+        """Construct a new multi-categorical distribution.
 
         Args:
             logits (*, n_categoricals,  n_classes)
                  | (*, n_categoricals * n_classes): unnormalized probability logits.
             n_categoricals (int): number of categoricals.
             n_classes (int): number of classes per categorical.
+            unimix (float): percentage uniform distribution mixed in. 1 is fully uniform, 0 is no uniform mixin.
         """
         self.n_categoricals = n_categoricals
         self.n_classes = n_classes
@@ -24,14 +25,12 @@ class DiscreteLatent:
             logits = logits.reshape(*logits.shape[:-1], n_categoricals, n_classes)
 
         self.probs = logits.softmax(dim=-1)
-        self.probs = mixin_uniform(self.probs)  # encourages well-behaved KL loss
+        self.probs = mixin_uniform(self.probs, split=unimix)  # encourages well-behaved KL loss
         self.log_probs = self.probs.log()
         self.dist = OneHotCategoricalStraightThrough(probs=self.probs)
 
     def sample(self):
-        """Sample a discrete state from the logits.
-
-        This method also passes gradients of underlying softmax distribution.
+        """Sample a categorical state from the logits.
 
         Returns:
             state (*, n_categoricals * n_classes)

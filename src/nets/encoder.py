@@ -1,5 +1,3 @@
-import logging
-
 from torch import nn
 
 

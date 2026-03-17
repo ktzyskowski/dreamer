@@ -1,15 +1,26 @@
 import torch
 
-from buffer import ReplayBuffer
-from models.actor import DiscreteActor
-from models.world_model import WorldModel
-from src.nn.functions import get_device
-from src.nn.losses import ActorLoss, WorldModelLoss
+from src.loss.world_model_loss import WorldModelLoss
+from src.util.buffer import ReplayBuffer
+from src.models.actor import DiscreteActor
+from src.models.critic import Critic
+from src.models.world_model import WorldModel
+from src.util.functions import get_device
+from src.util.env import EnvironmentManager
 
 
 class Trainer:
-    def __init__(self, world_model: WorldModel, actor: DiscreteActor, replay_buffer: ReplayBuffer, config):
-        # self.config = config
+    def __init__(
+        self,
+        env: EnvironmentManager,
+        world_model: WorldModel,
+        actor: DiscreteActor,
+        critic: Critic,
+        replay_buffer: ReplayBuffer,
+        config,
+    ):
+        self.env = env
+        self.replay_buffer = replay_buffer
         # =================================================
         # hyperparameters
         self.device = get_device(priority=config.device)
@@ -18,32 +29,32 @@ class Trainer:
 
         # =================================================
         # models
-        self.replay_buffer = replay_buffer
         self.world_model = world_model.to(self.device)
         self.actor = actor.to(self.device)
+        self.critc = critic.to(self.device)
 
         # =================================================
         # optimizers
-        self.world_model_optimizer = torch.optim.Muon(
+        self.world_model_optimizer = torch.optim.Adam(
             world_model.parameters(),
-            lr=config.training.world_model_lr,
+            lr=config.world_model.learning_rate,
         )
-        self.actor_optimizer = torch.optim.Muon(
+        self.actor_optimizer = torch.optim.Adam(
             actor.parameters(),
-            lr=config.training.actor_lr,
+            lr=config.actor.learning_rate,
+        )
+        self.critic_optimizer = torch.optim.Adam(
+            critic.parameters(),
+            lr=config.critic.learning_rate,
         )
 
         # =================================================
         # loss functions
         self.world_model_loss = WorldModelLoss(
-            beta_posterior=0.1,
-            beta_prior=1.0,
-            beta_prediction=1.0,
-            free_nats=1.0,
-        )
-        self.actor_loss = ActorLoss(
-            gamma=config.training.gamma,
-            entropy_coef=config.training.entropy_coef,
+            beta_posterior=config.world_model_loss.beta_posterior,
+            beta_prior=config.world_model_loss.beta_prior,
+            beta_prediction=config.world_model_loss.beta_prediction,
+            free_nats=config.world_model_loss.free_nats,
         )
 
     def _batch_to_device(self, batch):

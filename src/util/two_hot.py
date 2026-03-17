@@ -2,7 +2,7 @@ import torch
 
 
 class TwoHot:
-    """Two-hot representation of continuous values."""
+    """Two-hot representation of continuous scalar values."""
 
     def __init__(self, low: float, high: float, n_bins: int):
         self.low = low
@@ -11,14 +11,14 @@ class TwoHot:
 
     def encode(self, y):
         """
-        Encode the given tensor of scalars into two-hot encoding.
+        Encode the given tensor of values into two-hot encoding.
 
         This method accepts any shape, and will add a new dimension for the bin values.
 
         Args:
-            y (*): the tensor of scalars.
+            y (*): the tensor of values.
         Returns:
-            twohot (*, bins): the tensor of two-hot vectors.
+            two_hot (*, bins): the tensor of two-hot vectors.
         """
         bins = torch.linspace(self.low, self.high, self.n_bins, device=y.device)
 

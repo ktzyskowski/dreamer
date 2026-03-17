@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from src.nets.mlp import MultiLayerPerceptron
-from src.nets.functions import mixin_uniform
+from src.util.functions import mixin_uniform
 
 
 class DiscreteActor(nn.Module):

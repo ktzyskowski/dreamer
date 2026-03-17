@@ -1,6 +1,6 @@
 from torch import nn
 
-from src.nn.encoder import conv2d_output_size
+from .encoder import conv2d_output_size
 
 
 # Decoder
