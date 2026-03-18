@@ -50,20 +50,23 @@ class EnvironmentManager:
 
         # change dtype from uint8 to float32 and downscale from 0,255 to 0,1
         self._env = DtypeObservation(self._env, dtype=np.float32)
-        self._env = RescaleObservation(self._env, min_obs=np.float32(0.0), max_obs=np.float32(1.0))
+        self._env = RescaleObservation(
+            self._env, min_obs=np.float32(0.0), max_obs=np.float32(1.0)
+        )
 
         # CNN expects (channel, height, width), not (height, width, channel)
         old_observation_space = self._env.observation_space
-        new_observation_space = gym.spaces.Box(
-            low=np.moveaxis(old_observation_space.low, -1, 0),
-            high=np.moveaxis(old_observation_space.high, -1, 0),
-            dtype=old_observation_space.dtype,
-        )
-        self._env = TransformObservation(
-            self._env,
-            lambda observation: np.moveaxis(observation, -1, 0),
-            new_observation_space,
-        )
+        if isinstance(old_observation_space, gym.spaces.Box):
+            new_observation_space = gym.spaces.Box(
+                low=np.moveaxis(old_observation_space.low, -1, 0),
+                high=np.moveaxis(old_observation_space.high, -1, 0),
+                dtype=old_observation_space.dtype.type,
+            )
+            self._env = TransformObservation(
+                self._env,
+                lambda observation: np.moveaxis(observation, -1, 0),
+                new_observation_space,
+            )
 
         # wrapping env in torch makes our lives easier, less manual conversions
         self._env = NumpyToTorch(self._env)
@@ -86,7 +89,9 @@ class EnvironmentManager:
         # repeat given action specified number of times, accumulate
         # rewards per step and discard intermediate observations.
         for _ in range(self.action_repeat):
-            observation, step_reward, step_done, step_truncated, _ = self._env.step(action)
+            observation, step_reward, step_done, step_truncated, _ = self._env.step(
+                action
+            )
 
             reward += float(step_reward)
 

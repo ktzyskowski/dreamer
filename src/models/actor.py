@@ -1,6 +1,6 @@
-from omegaconf import DictConfig
 import torch
 import torch.nn.functional as F
+from omegaconf import DictConfig
 from torch import nn
 
 from src.nets.mlp import MultiLayerPerceptron
@@ -13,7 +13,7 @@ class DiscreteActor(nn.Module):
         self.action_size = output_size
         self.net = MultiLayerPerceptron(
             input_dim=input_size,
-            hidden_dims=tuple(config.actor.hidden_dims),
+            hidden_dims=config.actor.hidden_dims,
             output_dim=output_size,
         )
 

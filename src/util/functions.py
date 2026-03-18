@@ -1,3 +1,6 @@
+import logging
+from typing import Optional
+
 import torch
 from torch import nn
 
@@ -6,18 +9,19 @@ def count_parameters(model: nn.Module) -> int:
     """Count the number of trainable parameters in a given model.
 
     Args:
-        - model (nn.Module)
+        model (nn.Module)
     Returns:
-        - n_parameters: the total count of trainable model parameters.
+        n_parameters: the total count of trainable model parameters.
     """
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return n_parameters
 
 
-def get_device(priority: str = None) -> str:
+def get_device(priority: Optional[str] = None) -> str:
     """Get the torch device to use for training.
 
-    Priority:
+    Prioritizes the selected device, if available. Otherwise, will
+    follow the given ranking (highest priority to leftmost device):
 
     `[priority]` >> `cuda` >> `mps` >> `cpu`
 
@@ -29,10 +33,22 @@ def get_device(priority: str = None) -> str:
         devices.append("mps")
     if torch.cuda.is_available():
         devices.append("cuda")
-    if priority and priority in devices:
-        return priority
-    else:
-        return devices[-1]
+
+    # if user specified a device preference
+    if priority:
+        if priority in devices:
+            selected_device = priority
+        else:
+            selected_device = devices[-1]
+            logging.info(
+                "Device '{}' not available, resorting to '{}'",
+                priority,
+                selected_device,
+            )
+        return selected_device
+
+    # otherwise, return highest ranking available device
+    return devices[-1]
 
 
 def mixin_uniform(probs: torch.Tensor, split=0.01, dim=-1) -> torch.Tensor:
@@ -92,10 +108,10 @@ def calculate_lambda_returns(rewards, continues, values, gamma=0.997, lamda=0.95
     Eq (5) in paper.
 
     Lamda parameter controls the decay of returns across the trace (sequence returns). A value
-    of 1 indicates the whole sequence should contribute to the return (as in
+    of 1 indicates the whole trace should contribute to the return (as in
     Monte Carlo, except in this case we still are bootstrapping). A value of 0
     indicates that we should only use the next value following a reward to
-    approximate the return (as is done in Q-learning).
+    approximate the return (like in Q-learning).
 
     Args:
         rewards: observed rewards in batch.

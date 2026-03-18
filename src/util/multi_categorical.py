@@ -7,7 +7,9 @@ from src.util.functions import mixin_uniform
 class MultiCategorical:
     """Multi-Categorical distribution."""
 
-    def __init__(self, logits: Tensor, n_categoricals: int, n_classes: int, unimix: float = 0.01):
+    def __init__(
+        self, logits: Tensor, n_categoricals: int, n_classes: int, unimix: float = 0.01
+    ):
         """Construct a new multi-categorical distribution.
 
         Args:
@@ -25,7 +27,9 @@ class MultiCategorical:
             logits = logits.reshape(*logits.shape[:-1], n_categoricals, n_classes)
 
         self.probs = logits.softmax(dim=-1)
-        self.probs = mixin_uniform(self.probs, split=unimix)  # encourages well-behaved KL loss
+        self.probs = mixin_uniform(
+            self.probs, split=unimix
+        )  # encourages well-behaved KL loss
         self.log_probs = self.probs.log()
         self.dist = OneHotCategoricalStraightThrough(probs=self.probs)
 

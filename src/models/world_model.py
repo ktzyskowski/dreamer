@@ -2,11 +2,11 @@ import torch
 from torch import nn
 
 from src.nets.decoder import Decoder
-from src.util.multi_categorical import MultiCategorical
 from src.nets.encoder import Encoder
 from src.nets.mlp import MultiLayerPerceptron
 from src.nets.rnn import BlockDiagonalGRU
 from src.util.functions import symlog
+from src.util.multi_categorical import MultiCategorical
 from src.util.two_hot import TwoHot
 
 
@@ -90,7 +90,9 @@ class WorldModel(nn.Module):
 
     def get_full_state(self, observation, recurrent_state):
         posterior = MultiCategorical(
-            logits=self.posterior_net(torch.cat([recurrent_state, self.encoder(observation)], dim=-1)),
+            logits=self.posterior_net(
+                torch.cat([recurrent_state, self.encoder(observation)], dim=-1)
+            ),
             n_categoricals=self.n_categoricals,
             n_classes=self.n_classes,
         )
@@ -98,7 +100,9 @@ class WorldModel(nn.Module):
         return full_state
 
     def get_next_recurrent_state(self, full_state, action, recurrent_state):
-        next_recurrent_state = self.recurrent_model(torch.cat([full_state, action], dim=-1), recurrent_state)
+        next_recurrent_state = self.recurrent_model(
+            torch.cat([full_state, action], dim=-1), recurrent_state
+        )
         return next_recurrent_state
 
     def observe(self, batch):
@@ -119,7 +123,9 @@ class WorldModel(nn.Module):
         batch_size, sequence_length = observations.shape[0], observations.shape[1]
 
         # initialize recurrent state
-        recurrent_state = torch.zeros((batch_size, self.recurrent_size), device=observations.device)
+        recurrent_state = torch.zeros(
+            (batch_size, self.recurrent_size), device=observations.device
+        )
 
         # storing model outputs in a dictionary keeps things neat, we will
         # combine with original batch dictionary when returning
@@ -135,8 +141,8 @@ class WorldModel(nn.Module):
 
         # iterate through each time step to collect recurrent states, and posterior/prior log probs
         for t in range(sequence_length):
-            full_state, next_recurrent_state, posterior_log_probs, prior_log_probs = self.observed_step(
-                observations[:, t], actions[:, t], recurrent_state
+            full_state, next_recurrent_state, posterior_log_probs, prior_log_probs = (
+                self.observed_step(observations[:, t], actions[:, t], recurrent_state)
             )
             reconstructed_observation = self.decoder(full_state)
             predicted_reward_logits = self.reward_predictor(full_state)
@@ -181,9 +187,13 @@ class WorldModel(nn.Module):
         # recurrent_state:      (*, recurrent_size)
 
         if recurrent_state is None:
-            recurrent_state = torch.zeros(*observation.shape[:-3], self.recurrent_size, device=observation.device)
+            recurrent_state = torch.zeros(
+                *observation.shape[:-3], self.recurrent_size, device=observation.device
+            )
         posterior = MultiCategorical(
-            logits=self.posterior_net(torch.cat([recurrent_state, self.encoder(observation)], dim=-1)),
+            logits=self.posterior_net(
+                torch.cat([recurrent_state, self.encoder(observation)], dim=-1)
+            ),
             n_categoricals=self.n_categoricals,
             n_classes=self.n_classes,
         )
@@ -194,7 +204,9 @@ class WorldModel(nn.Module):
         )
         posterior_sample = posterior.sample()
         full_state = torch.cat([recurrent_state, posterior_sample], dim=-1)
-        recurrent_state = self.recurrent_model(torch.cat([full_state, action], dim=-1), recurrent_state)
+        recurrent_state = self.recurrent_model(
+            torch.cat([full_state, action], dim=-1), recurrent_state
+        )
 
         # full_state:           (*, full_state_size)
         # next_recurrent_state: (*, recurrent_size)
@@ -245,7 +257,9 @@ class WorldModel(nn.Module):
 
         # pass initial observation through posterior net to get first full state
         posterior = MultiCategorical(
-            logits=self.posterior_net(torch.cat([recurrent_state, self.encoder(observation)], dim=-1)),
+            logits=self.posterior_net(
+                torch.cat([recurrent_state, self.encoder(observation)], dim=-1)
+            ),
             n_categoricals=self.n_categoricals,
             n_classes=self.n_classes,
         )
@@ -271,7 +285,9 @@ class WorldModel(nn.Module):
             rollout_output["actions"].append(action)
             rollout_output["action_probs"].append(action_probs)
             rollout_output["predicted_reward_logits"].append(predicted_reward_logits)
-            rollout_output["predicted_continue_logits"].append(predicted_continue_logits)
+            rollout_output["predicted_continue_logits"].append(
+                predicted_continue_logits
+            )
 
         # stack all rollout outputs in sequence dimension
         for key in rollout_output.keys():
@@ -302,7 +318,9 @@ class WorldModel(nn.Module):
         )
         prior_sample = prior.sample()
         full_state = torch.cat([recurrent_state, prior_sample], dim=-1)
-        next_recurrent_state = self.recurrent_model(torch.cat([full_state, action], dim=-1), recurrent_state)
+        next_recurrent_state = self.recurrent_model(
+            torch.cat([full_state, action], dim=-1), recurrent_state
+        )
 
         # full_state:           (*, full_state_size)
         # next_recurrent_state: (*, recurrent_size)

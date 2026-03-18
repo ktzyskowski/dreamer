@@ -3,14 +3,13 @@ import logging
 import hydra
 from omegaconf import DictConfig
 
-from src.models.critic import Critic
 from src.models.actor import DiscreteActor
+from src.models.critic import Critic
 from src.models.world_model import WorldModel
-
-from src.util.functions import count_parameters
+from src.trainer import Trainer
 from src.util.buffer import ReplayBuffer
 from src.util.env import EnvironmentManager
-from src.trainer import Trainer
+from src.util.functions import count_parameters
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
@@ -20,13 +19,15 @@ def main(config: DictConfig):
 
     # context manager automatically handles environment during training
     with EnvironmentManager(config) as env:
-        observation_shape = env.observation_space.shape
+        # extract observation/action sizes from environment
         action_size = env.action_size
+        observation_shape = env.observation_space.shape
+        assert observation_shape is not None
 
         replay_buffer = ReplayBuffer(observation_shape, action_size, config)
         world_model = WorldModel(observation_shape, action_size, config)
-        actor = DiscreteActor(320, action_size, config)
-        critic = Critic(320, config)
+        actor = DiscreteActor(world_model.full_state_size, action_size, config)
+        critic = Critic(world_model.full_state_size, config)
         logging.info("World model # parameters: %d", count_parameters(world_model))
         logging.info("Actor # parameters: %d", count_parameters(actor))
         logging.info("Critic # parameters: %d", count_parameters(critic))

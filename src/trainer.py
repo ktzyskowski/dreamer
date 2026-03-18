@@ -1,12 +1,15 @@
 import torch
 
+from loss.actor_critic_loss import ActorCriticLoss
+from src.loss.actor_loss import ActorLoss
+from src.loss.critic_loss import CriticLoss
 from src.loss.world_model_loss import WorldModelLoss
-from src.util.buffer import ReplayBuffer
 from src.models.actor import DiscreteActor
 from src.models.critic import Critic
 from src.models.world_model import WorldModel
-from src.util.functions import get_device
+from src.util.buffer import ReplayBuffer
 from src.util.env import EnvironmentManager
+from src.util.functions import calculate_lambda_returns, get_device
 
 
 class Trainer:
@@ -31,7 +34,7 @@ class Trainer:
         # models
         self.world_model = world_model.to(self.device)
         self.actor = actor.to(self.device)
-        self.critc = critic.to(self.device)
+        self.critic = critic.to(self.device)
 
         # =================================================
         # optimizers
@@ -56,37 +59,80 @@ class Trainer:
             beta_prediction=config.world_model_loss.beta_prediction,
             free_nats=config.world_model_loss.free_nats,
         )
+        self.actor_critic_loss = ActorCriticLoss()
 
     def _batch_to_device(self, batch):
         """Move a batch to the trainer device, and convert any inputs to tensors."""
-        return {k: torch.tensor(v, dtype=torch.float32).to(self.device) for k, v in batch.items()}
+        return {
+            k: torch.tensor(v, dtype=torch.float32).to(self.device)
+            for k, v in batch.items()
+        }
 
     def train(self, env, n_steps=256):
         """Train the world model and actor/critic networks."""
 
-        recurrent_state = torch.zeros(self.world_model.recurrent_size, device=self.device)
+        recurrent_state = torch.zeros(
+            self.world_model.recurrent_size, device=self.device
+        )
         observation = env.reset()
         for step in range(n_steps):
-            full_state = self.world_model.get_full_state(observation.to(self.device), recurrent_state)
-            action, _ = self.actor(full_state)
+            with torch.no_grad():
+                full_state = self.world_model.get_full_state(
+                    observation.to(self.device), recurrent_state
+                )
+                action, _ = self.actor(full_state)
             action_idx = action.argmax(dim=-1).cpu().item()
 
             next_observation, reward, done = env.step(action_idx)
             self.replay_buffer.add(observation, action, reward, done)
 
             if done:
-                recurrent_state = torch.zeros(self.world_model.recurrent_size, device=self.device)
+                recurrent_state = torch.zeros(
+                    self.world_model.recurrent_size, device=self.device
+                )
                 observation = env.reset()
             else:
-                recurrent_state = self.world_model.get_next_recurrent_state(full_state, action, recurrent_state)
+                recurrent_state = self.world_model.get_next_recurrent_state(
+                    full_state, action, recurrent_state
+                )
                 observation = next_observation
 
             # perform gradient step
-            if step >= self.warmup_steps and step % replay_ratio == 0:
+            if step >= self.warmup_steps and step % self.replay_ratio == 0:
                 self.gradient_step()
 
     def gradient_step(self):
-        batch = self.replay_buffer.sample()
+        batch = self.replay_buffer.sample(batch_size=16, sequence_length=64)
+        batch = self._batch_to_device(batch)
+
+        # ======================================================= #
+
+        # train world model first on observed rollouts
+        self.world_model_optimizer.zero_grad()
+        awake_output = self.world_model.observe(batch)
+        loss = self.world_model_loss(awake_output)
+        loss.backward()
+        self.world_model_optimizer.step()
+
+        # ======================================================= #
+
+        # generate dream rollouts to train actor/critic
+        self.actor_optimizer.zero_grad()
+        self.critic_optimizer.zero_grad()
+
+        self.world_model.requires_grad_(False)
+        dream_output = self.world_model.dream(awake_output, actor=self.actor)
+        self.world_model.requires_grad_(True)
+        critic_value_logits, critic_values = self.critic(dream_output["full_states"])
+        dream_output["critic_value_logits"] = critic_value_logits
+        dream_output["critic_values"] = critic_values
+        dream_output["rewards"] = self.world_model.two_hot.decode(
+            dream_output["predicted_reward_logits"]
+        )
+        actor_critic_loss = self.actor_critic_loss(dream_output)
+        actor_critic_loss.backward()
+        self.actor_optimizer.step()
+        self.critic_optimizer.step()
 
 
 # def train_world_model(self, batch):

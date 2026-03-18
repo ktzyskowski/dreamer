@@ -10,10 +10,12 @@ class Critic(nn.Module):
         super().__init__()
         self.net = MultiLayerPerceptron(
             input_dim=input_size,
-            hidden_dims=tuple(config.critic.hidden_dims),
+            hidden_dims=config.critic.hidden_dims,
             output_dim=config.two_hot.n_bins,
         )
-        self.two_hot = TwoHot(config.two_hot.low, config.two_hot.high, config.two_hot.n_bins)
+        self.two_hot = TwoHot(
+            config.two_hot.low, config.two_hot.high, config.two_hot.n_bins
+        )
 
         # initialize weights of output layer to be zero,
         # done to avoid hallucinating rewards early in training

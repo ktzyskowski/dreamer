@@ -1,6 +1,6 @@
 import numpy as np
-from omegaconf import DictConfig
 import torch
+from omegaconf import DictConfig
 
 
 class ReplayBuffer:
@@ -49,7 +49,9 @@ class ReplayBuffer:
     def sample(self, batch_size, sequence_length):
         """Sample a batch of sequences of transitions from the replay buffer."""
         if len(self) < sequence_length:
-            raise ValueError("Not enough transitions in the buffer to sample a sequence of the requested length.")
+            raise ValueError(
+                "Not enough transitions in the buffer to sample a sequence of the requested length."
+            )
 
         max_start_index = self.buffer_index - sequence_length
         start_index_pool = np.arange(0, max_start_index + 1)
@@ -57,7 +59,9 @@ class ReplayBuffer:
         # if the buffer is full, we can also sample sequences that wrap around the end of the buffer,
         # because the buffer index has wrapped around and is now at the beginning of the buffer
         if self.is_full:
-            start_index_pool = np.concatenate((start_index_pool, np.arange(self.buffer_index, self.capacity)))
+            start_index_pool = np.concatenate(
+                (start_index_pool, np.arange(self.buffer_index, self.capacity))
+            )
 
         # filter out start indices where the sequence crosses an episode boundary.
         # a done=True at step t means the episode ended there; step t+1 belongs to a new episode.
@@ -67,22 +71,45 @@ class ReplayBuffer:
                 [
                     idx
                     for idx in start_index_pool
-                    if not np.any(gather_sequence(self.dones, idx, sequence_length - 1).astype(bool))
+                    if not np.any(
+                        gather_sequence(self.dones, idx, sequence_length - 1).astype(
+                            bool
+                        )
+                    )
                 ]
             )
 
         if len(start_index_pool) < batch_size:
-            raise ValueError("Not enough valid sequences (respecting episode boundaries) to fill the requested batch.")
+            raise ValueError(
+                "Not enough valid sequences (respecting episode boundaries) to fill the requested batch."
+            )
 
-        start_indices = np.random.choice(start_index_pool, size=batch_size, replace=False)
+        start_indices = np.random.choice(
+            start_index_pool, size=batch_size, replace=False
+        )
 
         # gather sequences of transitions for each sampled start index
         batch_observations = np.array(
-            [gather_sequence(self.observations, idx, sequence_length) for idx in start_indices]
+            [
+                gather_sequence(self.observations, idx, sequence_length)
+                for idx in start_indices
+            ]
         )
-        batch_actions = np.array([gather_sequence(self.actions, idx, sequence_length) for idx in start_indices])
-        batch_rewards = np.array([gather_sequence(self.rewards, idx, sequence_length) for idx in start_indices])
-        batch_dones = np.array([gather_sequence(self.dones, idx, sequence_length) for idx in start_indices])
+        batch_actions = np.array(
+            [
+                gather_sequence(self.actions, idx, sequence_length)
+                for idx in start_indices
+            ]
+        )
+        batch_rewards = np.array(
+            [
+                gather_sequence(self.rewards, idx, sequence_length)
+                for idx in start_indices
+            ]
+        )
+        batch_dones = np.array(
+            [gather_sequence(self.dones, idx, sequence_length) for idx in start_indices]
+        )
         return {
             "observations": batch_observations,
             "actions": batch_actions,
