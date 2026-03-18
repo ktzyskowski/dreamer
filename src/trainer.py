@@ -1,8 +1,6 @@
 import torch
 
 from loss.actor_critic_loss import ActorCriticLoss
-from src.loss.actor_loss import ActorLoss
-from src.loss.critic_loss import CriticLoss
 from src.loss.world_model_loss import WorldModelLoss
 from src.models.actor import DiscreteActor
 from src.models.critic import Critic
