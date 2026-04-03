@@ -1,3 +1,12 @@
+# TODO: observe() has a sequential Python loop over sequence_length timesteps. The GRU step
+# must remain sequential (each h_t depends on h_{t-1}), but the encoder, decoder, reward
+# predictor, and continue predictor are all independent across timesteps and could be applied
+# to all timesteps at once by flattening the sequence into the batch dimension before the loop
+# (encoder/decoder already support arbitrary leading dims). Restructure observe() to:
+#   1. Encode all timesteps at once: encoder(observations.flatten(0,1)).unflatten(0, (B, T))
+#   2. Loop only for the GRU hidden state updates
+#   3. Apply decoder/reward/continue predictors to all collected full_states at once after the loop
+
 from typing import Optional
 import typing
 
@@ -12,29 +21,6 @@ from src.nets.rnn import BlockDiagonalGRU
 from src.util.multi_categorical import MultiCategorical
 
 
-def _condense_rollouts(list_of_rollouts: list[dict[str, Tensor]]) -> dict[str, Tensor]:
-    """Condense a list of dicts of rollout tensors into a single dict of stacked tensors.
-
-    The batch and rollout dimensions are flattened to remove the rollout dimension, because
-    during the dream phase, each time step in a sequence in each batch generates a rollout,
-    resulting in a new dimension.
-    """
-
-    assert len(list_of_rollouts) > 0
-    keys = list_of_rollouts[0].keys()  # all dicts in list should have same keys
-
-    rollouts = {}
-    for key in keys:
-        tensors = [rollout[key] for rollout in list_of_rollouts]
-        rollouts[key] = torch.stack(tensors, dim=1)
-
-    # flatten batch & rollout into single dimension
-    for key in rollouts:
-        rollouts[key] = rollouts[key].flatten(0, 1)
-
-    return rollouts
-
-
 class WorldModel(nn.Module):
     """The main world model class."""
 
@@ -42,6 +28,7 @@ class WorldModel(nn.Module):
         super().__init__()
         # hyperparameters
         self.dream_horizon = config.world_model.dream_horizon
+        self.n_dreams = config.world_model.n_dreams
 
         # shapes/sizes
         self.recurrent_size = config.world_model.recurrent_size
@@ -215,16 +202,15 @@ class WorldModel(nn.Module):
         observations = batch["observations"]
         sequence_length = observations.shape[1]
 
-        rollouts = []
-        for t in range(sequence_length):
-            # start a new dream rollout rooted in each observation/recurrent state in the sequence
-            recurrent_state = recurrent_states[:, t]
-            observation = observations[:, t]
-            rollout = self.dream_rollout(observation, recurrent_state, actor)
-            rollouts.append(rollout)
+        # randomly sample starting timesteps instead of using all
+        starting_timesteps = torch.randperm(sequence_length, device=recurrent_states.device)[: self.n_dreams]
 
-        # stack rollouts into single tensor per key
-        rollouts = typing.cast(DreamOutput, _condense_rollouts(rollouts))
+        # select starting states and flatten batch & sequences into one batch dimension
+        flattened_observations = observations[:, starting_timesteps].flatten(0, 1)
+        flattened_recurrent_states = recurrent_states[:, starting_timesteps].flatten(0, 1)
+
+        rollouts = self.dream_rollout(flattened_observations, flattened_recurrent_states, actor)
+        rollouts = typing.cast(DreamOutput, rollouts)
 
         return rollouts
 

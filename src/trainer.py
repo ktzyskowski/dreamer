@@ -143,4 +143,4 @@ class Trainer:
                 step=self.gradient_step_counter,
             )
         self.gradient_step_counter += 1
-        logging.info("Gradients performed: %d", self.gradient_step_counter)
+        logging.info("Gradient steps performed: %d", self.gradient_step_counter)

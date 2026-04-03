@@ -26,6 +26,8 @@ replay_buffer:
 world_model:
   learning_rate: 3e-4
   dream_horizon: 15
+  n_dreams: 16
+
   recurrent_size: 128
   n_categoricals: 32
   n_classes: 32
