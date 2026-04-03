@@ -1,4 +1,7 @@
+import logging
+
 import torch
+import wandb
 
 from src.loss.actor_critic_loss import ActorCriticLoss
 from src.loss.world_model_loss import WorldModelLoss
@@ -23,9 +26,13 @@ class Trainer:
         self.env = env
         self.replay_buffer = replay_buffer
 
+        self.gradient_step_counter = 0
+
         # =================================================
         # hyperparameters
         self.device = get_device(priority=config.device)
+        logging.info("Using device %s", self.device)
+
         self.warmup_steps = config.warmup_steps
         self.replay_ratio = config.replay_ratio
         self.batch_size = config.batch_size
@@ -96,8 +103,8 @@ class Trainer:
         # train world model first on observed rollouts
         self.world_model_optimizer.zero_grad()
         observed_output = self.world_model.observe(batch)
-        loss = self.world_model_loss(batch, observed_output)
-        loss.backward()
+        world_model_loss = self.world_model_loss(batch, observed_output)
+        world_model_loss.backward()
         self.world_model_optimizer.step()
 
         # ======================================================= #
@@ -117,75 +124,23 @@ class Trainer:
         self.actor_optimizer.step()
         self.critic_optimizer.step()
 
-        print("One gradient step done!")
+        # log metrics
+        wandb.log(
+            {
+                "loss/world_model": world_model_loss.item(),
+                "loss/actor_critic": actor_critic_loss.item(),
+            },
+            step=self.gradient_step_counter,
+        )
 
-
-# def train_world_model(self, batch):
-#     """Run observe on a batch and backprop the world model loss.
-
-#     Returns:
-#         observed: the full observed batch (model outputs merged with original batch)
-#         loss: scalar loss value
-#     """
-#     self.world_model_optimizer.zero_grad()
-#     observed = self.world_model.observe(batch)
-#     loss = self.world_model_loss(observed)
-#     loss.backward()
-#     self.world_model_optimizer.step()
-#     return observed, loss.item()
-
-# def train_actor(self, observed_batch):
-#     """Dream from the observed batch and backprop the actor loss.
-
-#     The world model is frozen during the dream so that gradients accumulate
-#     only in actor parameters. Gradients still flow through the dream states
-#     into the actor, giving a more accurate policy gradient signal than
-#     re-evaluating the actor on detached states.
-
-#     Returns:
-#         loss: scalar loss value
-#     """
-#     self.actor_optimizer.zero_grad()
-
-#     self.world_model.requires_grad_(False)
-#     dream_rollout = self.world_model.dream(observed_batch, self.actor)
-#     self.world_model.requires_grad_(True)
-
-#     # dream_rollout
-#     # ============
-#     # full_states:               (N, dream_horizon + 1, full_state_size)
-#     # actions:                   (N, dream_horizon + 1, action_size)
-#     # action_probs:              (N, dream_horizon + 1, action_size)
-#     # predicted_reward_logits:   (N, dream_horizon, bins)
-#     # predicted_continue_logits: (N, dream_horizon, 1)
-
-#     # Slice off the last state/action since there is no corresponding reward for it
-#     actor_batch = {
-#         "actions": dream_rollout["actions"][:, :-1],
-#         "action_probs": dream_rollout["action_probs"][:, :-1],
-#         "decoded_rewards": symexp(self.world_model.two_hot.decode(dream_rollout["predicted_reward_logits"])),
-#         "predicted_continue_logits": dream_rollout["predicted_continue_logits"],
-#     }
-
-#     loss = self.actor_loss(actor_batch)
-#     loss.backward()
-#     self.actor_optimizer.step()
-#     return loss.item()
-
-# def train(self):
-#     """Sample a batch, train the world model, then train the actor.
-
-#     Returns:
-#         dict of scalar loss values
-#     """
-#     batch = self.replay_buffer.sample(self.config.batch_size, self.config.sequence_length)
-#     batch = self._batch_to_device(batch)
-
-#     observed, wm_loss = self.train_world_model(batch)
-
-#     # Detach all observed tensors so actor training cannot backprop into the world model
-#     # via the observed sequence (gradients are only intended to flow through dream states)
-#     observed_detached = {k: v.detach() if torch.is_tensor(v) else v for k, v in observed.items()}
-#     actor_loss = self.train_actor(observed_detached)
-
-#     return {"world_model_loss": wm_loss, "actor_loss": actor_loss}
+        # log images (tensor shape: C, H, W or B, C, H, W)
+        if self.gradient_step_counter % 10 == 0:
+            wandb.log(
+                {
+                    "images/real": wandb.Image(batch["observations"][0, 0]),
+                    "images/reconstructed": wandb.Image(observed_output["reconstructed_observations"][0, 0]),
+                },
+                step=self.gradient_step_counter,
+            )
+        self.gradient_step_counter += 1
+        logging.info("Gradients performed: %d", self.gradient_step_counter)

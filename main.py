@@ -1,7 +1,8 @@
 import logging
 
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
+import wandb
 
 from src.models.actor import DiscreteActor
 from src.models.critic import Critic
@@ -16,6 +17,12 @@ from src.util.functions import count_parameters
 def main(config: DictConfig):
     # set up logging
     logging.basicConfig()
+    wandb.init(
+        project="dreamer",
+        config=OmegaConf.to_container(config, resolve=True),
+        settings=wandb.Settings(_disable_stats=True),
+        mode="offline",
+    )
 
     # context manager automatically handles environment during training
     with EnvironmentManager(config) as env:
@@ -34,6 +41,8 @@ def main(config: DictConfig):
 
         trainer = Trainer(env, world_model, actor, critic, replay_buffer, config)
         trainer.train(env, n_steps=10_000)
+
+    wandb.finish()
 
 
 if __name__ == "__main__":

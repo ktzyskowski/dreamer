@@ -15,3 +15,6 @@ outputs/
 # IDE files
 .vscode/
 .idea/
+
+# Weights and Biases
+wandb/
