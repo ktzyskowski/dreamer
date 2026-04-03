@@ -9,5 +9,5 @@ class ExpMovingAverage(nn.Module):
         self.register_buffer("average", torch.tensor(0.0))
 
     def forward(self, x):
-        self.average = (x * self.decay) + (1 - self.decay) * self.average
+        self.average = self.decay * self.average + (1 - self.decay) * x
         return self.average

@@ -13,9 +13,6 @@ class Critic(nn.Module):
             hidden_dims=config.critic.hidden_dims,
             output_dim=config.two_hot.n_bins,
         )
-        self.two_hot = TwoHot(
-            config.two_hot.low, config.two_hot.high, config.two_hot.n_bins
-        )
 
         # initialize weights of output layer to be zero,
         # done to avoid hallucinating rewards early in training
@@ -24,11 +21,5 @@ class Critic(nn.Module):
 
     def forward(self, state):
         """Returns both the logits (for loss) and decoded scalar value."""
-        # state:    (*, input_dim)
-
         logits = self.net(state)
-        value = self.two_hot.decode(logits)
-
-        # logits:   (*, n_bins)
-        # value:    (*)
-        return logits, value
+        return logits

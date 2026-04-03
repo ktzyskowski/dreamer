@@ -1,6 +1,8 @@
 device: cuda
 warmup_steps: 1_024
 replay_ratio: 32
+batch_size: 16
+sequence_length: 32
 
 environment:
   name: ALE/Breakout-v5
@@ -15,7 +17,7 @@ two_hot:
   high: 20
 
 replay_buffer:
-  capacity: 10_000
+  capacity: 50_000
   # capacity: 5_000_000
   dtype: float32
 
@@ -59,8 +61,8 @@ world_model_loss:
   beta_prediction: 1.0
   free_nats: 1.0
 
-actor_loss:
-  gamma:
+actor_critic_loss:
+  eta: 1
 
 # ============================== #
 # ============================== #

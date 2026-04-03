@@ -123,7 +123,7 @@ def calculate_lambda_returns(rewards, continues, values, gamma=0.997, lamda=0.95
         returns: bootstrapped returns over batch.
     """
     T = values.shape[-1] - 1  # last index in sequence
-    returns = torch.zeros_like(rewards)
+    returns = torch.zeros_like(values)
 
     # the return at time T is equal to the value at time T (bootstrap value)
     returns[..., T] = values[..., T]
