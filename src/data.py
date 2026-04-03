@@ -47,7 +47,7 @@ class ObservedOutput(TypedDict):
 
 class DreamOutput(TypedDict):
     # (batch * rollouts, sequence + 1, full_state_size)
-    full_state: Tensor
+    full_states: Tensor
 
     # (batch * rollouts, sequence + 1, action_size)
     actions: Tensor

@@ -103,7 +103,7 @@ class Trainer:
         # ======================================================= #
 
         # generate dream rollouts to train actor/critic
-        recurrent_states = observed_output["recurrent_states"]
+        recurrent_states = observed_output["recurrent_states"].detach()
         self.actor_optimizer.zero_grad()
         self.critic_optimizer.zero_grad()
 
@@ -116,6 +116,8 @@ class Trainer:
 
         self.actor_optimizer.step()
         self.critic_optimizer.step()
+
+        print("One gradient step done!")
 
 
 # def train_world_model(self, batch):

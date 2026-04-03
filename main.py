@@ -33,7 +33,7 @@ def main(config: DictConfig):
         logging.info("Critic # parameters: %d", count_parameters(critic))
 
         trainer = Trainer(env, world_model, actor, critic, replay_buffer, config)
-        # trainer.train(env, n_steps=256)
+        trainer.train(env, n_steps=10_000)
 
 
 if __name__ == "__main__":

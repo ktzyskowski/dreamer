@@ -60,7 +60,7 @@ class WorldModel(nn.Module):
         )
         self.decoder = Decoder(
             observation_shape=observation_shape,
-            input_dim=self.latent_size,
+            input_dim=self.full_state_size,
             kernel_size=config.world_model.encoder.kernel_size,
             stride=config.world_model.encoder.stride,
             padding=config.world_model.encoder.padding,

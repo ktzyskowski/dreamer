@@ -24,7 +24,6 @@ class WorldModelLoss:
         loss = torch.max(torch.full_like(loss, self.free_nats), loss)
         # sum over clipped categoricals, take mean per batch
         loss = loss.sum(-1).mean()
-        loss = loss
         return loss
 
     def calculate_prior_loss(self, observed_output: ObservedOutput):
@@ -59,7 +58,7 @@ class WorldModelLoss:
         observation_loss = F.mse_loss(observations, reconstructed_observations)
 
         dones = batch["dones"]
-        predicted_continue_logits = observed_output["predicted_continue_logits"]
+        predicted_continue_logits = observed_output["predicted_continue_logits"].squeeze(-1)
         continues = 1 - dones
         continue_loss = F.binary_cross_entropy_with_logits(predicted_continue_logits, continues)
 
