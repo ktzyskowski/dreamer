@@ -3,8 +3,9 @@ import torch
 from torch.distributions import Categorical
 import torch.nn.functional as F
 
-from src.data import DreamOutput, WorldModelInput
-from src.util.functions import calculate_lambda_returns, symexp, symlog
+from src.models.critic import DualCritic
+from src.data import DreamOutput
+from src.util.functions import calculate_lambda_returns
 from src.util.two_hot import TwoHot
 from src.util.ema import ExpMovingAverage
 
@@ -26,13 +27,13 @@ class ActorCriticLoss(nn.Module):
         # see world_model_loss.py
         self.metrics = {}
 
-    def forward(self, dream_output: DreamOutput, critic: nn.Module):
+    def forward(self, dream_output: DreamOutput, critic: DualCritic):
         # reset metrics accumulator
         self.metrics = {}
 
         # calculate lambda returns, required by both actor and critic loss functions
-        critic_logits = critic(dream_output["full_states"])
-        critic_values = self.two_hot.decode(critic_logits)
+        critic_logits = critic.fast(dream_output["full_states"])
+        critic_values = self.two_hot.decode(critic.slow(dream_output["full_states"]))
         continues = torch.distributions.Bernoulli(logits=dream_output["predicted_continue_logits"]).probs
         rewards = self.two_hot.decode(dream_output["predicted_reward_logits"])
         lambda_returns = calculate_lambda_returns(
@@ -76,9 +77,11 @@ class ActorCriticLoss(nn.Module):
 
         self.metrics["actor/entropy"] = entropy_term.mean().item()
         self.metrics["actor/advantage_mean"] = advantage.mean().item()
+        self.metrics["actor/max_action_prob"] = action_probs.max(dim=-1).values.mean().item()
         self.metrics["returns/mean"] = lambda_returns.mean().item()
         self.metrics["returns/p5"] = p5.item()
         self.metrics["returns/p95"] = p95.item()
+        self.metrics["returns/p95-p5"] = self.metrics["returns/p95"] - self.metrics["returns/p5"]
         self.metrics["returns/norm"] = norm_term.item()
 
         return loss

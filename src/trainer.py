@@ -6,7 +6,7 @@ import mlflow
 from src.loss.actor_critic_loss import ActorCriticLoss
 from src.loss.world_model_loss import WorldModelLoss
 from src.models.actor import DiscreteActor
-from src.models.critic import Critic
+from src.models.critic import DualCritic
 from src.models.world_model import WorldModel
 from src.util.buffer import ReplayBuffer
 from src.util.env import EnvironmentManager
@@ -19,13 +19,12 @@ class Trainer:
         env: EnvironmentManager,
         world_model: WorldModel,
         actor: DiscreteActor,
-        critic: Critic,
+        critic: DualCritic,
         replay_buffer: ReplayBuffer,
         config,
     ):
         self.env = env
         self.replay_buffer = replay_buffer
-
         self.gradient_step_counter = 0
 
         # =================================================
@@ -55,7 +54,7 @@ class Trainer:
             lr=config.actor.learning_rate,
         )
         self.critic_optimizer = torch.optim.Adam(
-            critic.parameters(),
+            critic.fast.parameters(),
             lr=config.critic.learning_rate,
         )
 
@@ -148,6 +147,7 @@ class Trainer:
 
         self.actor_optimizer.step()
         self.critic_optimizer.step()
+        self.critic.update_slow()
 
         # ======================================================= #
 

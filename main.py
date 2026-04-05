@@ -5,7 +5,7 @@ from omegaconf import DictConfig, OmegaConf
 import mlflow
 
 from src.models.actor import DiscreteActor
-from src.models.critic import Critic
+from src.models.critic import DualCritic
 from src.models.world_model import WorldModel
 from src.trainer import Trainer
 from src.util.buffer import ReplayBuffer
@@ -32,7 +32,7 @@ def main(config: DictConfig):
         replay_buffer = ReplayBuffer(observation_shape, action_size, config)
         world_model = WorldModel(observation_shape, action_size, config)
         actor = DiscreteActor(world_model.full_state_size, action_size, config)
-        critic = Critic(world_model.full_state_size, config)
+        critic = DualCritic(world_model.full_state_size, config)
         logging.info("World model # parameters: %d", count_parameters(world_model))
         logging.info("Actor # parameters: %d", count_parameters(actor))
         logging.info("Critic # parameters: %d", count_parameters(critic))
