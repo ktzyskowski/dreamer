@@ -89,18 +89,18 @@ class WorldModel(nn.Module):
         device = next(self.parameters()).device
         return device
 
-    def get_full_state(self, observation: Optional[Tensor], recurrent_state: Tensor):
-        """Get the full model state and latent log probabilities, given an observation and recurrent state.
+    def get_full_state(self, encoded_observation: Optional[Tensor], recurrent_state: Tensor):
+        """Get the full model state and latent log probabilities, given an encoded observation and recurrent state.
 
-        The observation is used to condition the posterior distribution, from which a sample is collected
+        The encoded observation is used to condition the posterior distribution, from which a sample is collected
         and concatenated with the given recurrent state to produce a model state.
 
         If an observation is not provided, then the prior distribution is used instead to generate a sample.
         """
-        if observation is not None:
+        if encoded_observation is not None:
             # use posterior
             distribution = MultiCategorical(
-                logits=self.posterior_net(torch.cat([recurrent_state, self.encoder(observation)], dim=-1)),
+                logits=self.posterior_net(torch.cat([recurrent_state, encoded_observation], dim=-1)),
                 n_categoricals=self.n_categoricals,
                 n_classes=self.n_classes,
             )
@@ -133,6 +133,8 @@ class WorldModel(nn.Module):
         """
 
         observations = batch["observations"]
+        # batch encode observations outside of loop
+        encoded_observations = self.encoder(observations)
         actions = batch["actions"]
         batch_size, sequence_length = observations.shape[0], observations.shape[1]
 
@@ -141,40 +143,45 @@ class WorldModel(nn.Module):
 
         # storing model outputs in a dictionary to keep things neat,
         # we will convert the lists to tensors at the end
-        observed_output = ObservedOutput(
-            reconstructed_observations=[],
-            full_states=[],
-            recurrent_states=[],
-            posterior_log_probs=[],
-            prior_log_probs=[],
-            predicted_reward_logits=[],
-            predicted_continue_logits=[],
-        )
+        observed_output = {
+            # reconstructed_observations=[],
+            "full_states": [],
+            "recurrent_states": [],
+            "posterior_log_probs": [],
+            "prior_log_probs": [],
+            # predicted_reward_logits=[],
+            # predicted_continue_logits=[],
+        }
 
         # iterate through each time step to collect recurrent states, and posterior/prior log probs
         for t in range(sequence_length):
             full_state, next_recurrent_state, posterior_log_probs, prior_log_probs = self.observed_step(
-                observations[:, t], actions[:, t], recurrent_state
+                encoded_observations[:, t], actions[:, t], recurrent_state
             )
-            reconstructed_observation = self.decoder(full_state)
-            predicted_reward_logits = self.reward_predictor(full_state)
-            predicted_continue_logits = self.continue_predictor(full_state)
-            observed_output["reconstructed_observations"].append(reconstructed_observation)
+            # reconstructed_observation = self.decoder(full_state)
+            # predicted_reward_logits = self.reward_predictor(full_state)
+            # predicted_continue_logits = self.continue_predictor(full_state)
+            # observed_output["reconstructed_observations"].append(reconstructed_observation)
+            # observed_output["predicted_reward_logits"].append(predicted_reward_logits)
+            # observed_output["predicted_continue_logits"].append(predicted_continue_logits)
             observed_output["full_states"].append(full_state)
             observed_output["recurrent_states"].append(recurrent_state)
             observed_output["posterior_log_probs"].append(posterior_log_probs)
             observed_output["prior_log_probs"].append(prior_log_probs)
-            observed_output["predicted_reward_logits"].append(predicted_reward_logits)
-            observed_output["predicted_continue_logits"].append(predicted_continue_logits)
             recurrent_state = next_recurrent_state
 
         # stack all model outputs in sequence dimension
         for key in observed_output.keys():
             observed_output[key] = torch.stack(observed_output[key], dim=1)  # type: ignore
 
+        # batch process full states outside of loop
+        observed_output["reconstructed_observations"] = self.decoder(observed_output["full_states"])
+        observed_output["predicted_continue_logits"] = self.continue_predictor(observed_output["full_states"])
+        observed_output["predicted_reward_logits"] = self.reward_predictor(observed_output["full_states"])
+
         return observed_output
 
-    def observed_step(self, observation: Tensor, action: Tensor, recurrent_state: Tensor):
+    def observed_step(self, encoded_observation: Tensor, action: Tensor, recurrent_state: Tensor):
         """Take an observed step through the world model.
 
         Log-probabilities are computed for both the posterior and prior latent distributions, even though
@@ -182,11 +189,11 @@ class WorldModel(nn.Module):
         are used later during loss calculation for the world model.
         """
         full_state, posterior_log_probs = self.get_full_state(
-            observation=observation,
+            encoded_observation=encoded_observation,
             recurrent_state=recurrent_state,
         )
         _, prior_log_probs = self.get_full_state(
-            observation=None,
+            encoded_observation=None,
             recurrent_state=recurrent_state,
         )
         recurrent_state = self.get_next_recurrent_state(full_state, action, recurrent_state)
@@ -200,13 +207,14 @@ class WorldModel(nn.Module):
         """
 
         observations = batch["observations"]
+        encoded_observations = self.encoder(observations)
         sequence_length = observations.shape[1]
 
         # randomly sample starting timesteps instead of using all
         starting_timesteps = torch.randperm(sequence_length, device=recurrent_states.device)[: self.n_dreams]
 
         # select starting states and flatten batch & sequences into one batch dimension
-        flattened_observations = observations[:, starting_timesteps].flatten(0, 1)
+        flattened_observations = encoded_observations[:, starting_timesteps].flatten(0, 1)
         flattened_recurrent_states = recurrent_states[:, starting_timesteps].flatten(0, 1)
 
         rollouts = self.dream_rollout(flattened_observations, flattened_recurrent_states, actor)
@@ -214,38 +222,41 @@ class WorldModel(nn.Module):
 
         return rollouts
 
-    def dream_rollout(self, observation: Tensor, recurrent_state: Tensor, actor: nn.Module):
-        # observation:      (batch, channel, height, width)
-        # recurrent_state:  (batch, recurrent_size)
+    def dream_rollout(self, encoded_observation: Tensor, recurrent_state: Tensor, actor: nn.Module):
+        # encoded_observation:  (batch, latent_size)
+        # recurrent_state:      (batch, recurrent_size)
 
         # our initial full state is created from the posterior distribution,
         # conditioned on the initial observation
-        full_state, _ = self.get_full_state(observation=observation, recurrent_state=recurrent_state)
+        full_state, _ = self.get_full_state(encoded_observation=encoded_observation, recurrent_state=recurrent_state)
         action, action_probs = actor(full_state)
 
         rollout_output = {
             "full_states": [full_state],
             "actions": [action],
             "action_probs": [action_probs],
-            "predicted_reward_logits": [],
-            "predicted_continue_logits": [],
+            # "predicted_reward_logits": [],
+            # "predicted_continue_logits": [],
         }
 
         # from here on out, we're sailing through a dream!
         for _ in range(self.dream_horizon):
             full_state, recurrent_state, _ = self.dream_step(action, recurrent_state)
             action, action_probs = actor(full_state)
-            predicted_reward_logits = self.reward_predictor(full_state)
-            predicted_continue_logits = self.continue_predictor(full_state)
+            # predicted_reward_logits = self.reward_predictor(full_state)
+            # predicted_continue_logits = self.continue_predictor(full_state)
             rollout_output["full_states"].append(full_state)
             rollout_output["actions"].append(action)
             rollout_output["action_probs"].append(action_probs)
-            rollout_output["predicted_reward_logits"].append(predicted_reward_logits)
-            rollout_output["predicted_continue_logits"].append(predicted_continue_logits)
+            # rollout_output["predicted_reward_logits"].append(predicted_reward_logits)
+            # rollout_output["predicted_continue_logits"].append(predicted_continue_logits)
 
         # stack all rollout outputs in sequence dimension
         for key in rollout_output.keys():
             rollout_output[key] = torch.stack(rollout_output[key], dim=1)  # type: ignore
+
+        rollout_output["predicted_reward_logits"] = self.reward_predictor(rollout_output["full_states"][:, 1:])
+        rollout_output["predicted_continue_logits"] = self.continue_predictor(rollout_output["full_states"][:, 1:])
 
         # rollout_output
         # ==============
@@ -261,6 +272,6 @@ class WorldModel(nn.Module):
 
         Because we do not have an observation, we only utilize the prior distribution to create our model state.
         """
-        full_state, prior_log_probs = self.get_full_state(observation=None, recurrent_state=recurrent_state)
+        full_state, prior_log_probs = self.get_full_state(encoded_observation=None, recurrent_state=recurrent_state)
         next_recurrent_state = self.get_next_recurrent_state(full_state, action, recurrent_state)
         return full_state, next_recurrent_state, prior_log_probs

@@ -87,7 +87,8 @@ class Trainer:
         observation = env.reset()
         for step in range(n_steps):
             with torch.no_grad():
-                full_state, _ = self.world_model.get_full_state(observation.to(self.device), recurrent_state)
+                encoded_observation = self.world_model.encoder(observation.to(self.device))
+                full_state, _ = self.world_model.get_full_state(encoded_observation, recurrent_state)
                 action, _ = self.actor(full_state)
             action_idx = action.argmax(dim=-1).cpu().item()
 
@@ -148,6 +149,8 @@ class Trainer:
         self.actor_optimizer.step()
         self.critic_optimizer.step()
 
+        # ======================================================= #
+
         # log metrics
         mlflow.log_metrics(
             {
@@ -157,13 +160,6 @@ class Trainer:
             step=self.gradient_step_counter,
         )
 
-        # def _to_hwc(observation):
-        #     return observation.cpu().detach().permute(1, 2, 0).numpy()
-
-        # # log images (tensor shape: C, H, W or B, C, H, W)
-        # if self.gradient_step_counter % 10 == 0:
-        #     mlflow.log_image(_to_hwc(batch["observations"][0, 0]), "real.png")
-        #     mlflow.log_image(_to_hwc(observed_output["reconstructed_observations"][0, 0]), "reconstructed.png")
-        
         self.gradient_step_counter += 1
-        # logging.info("Gradient steps performed: %d", self.gradient_step_counter)
+        if self.gradient_step_counter % 25 == 0:
+            logging.info("Gradient steps performed: %d", self.gradient_step_counter)
