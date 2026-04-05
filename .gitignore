@@ -21,3 +21,4 @@ wandb/
 
 # MLflow
 mlflow.db
+mlruns/
