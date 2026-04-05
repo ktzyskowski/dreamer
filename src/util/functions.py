@@ -5,6 +5,17 @@ import torch
 from torch import nn
 
 
+def flatten(d: dict, parent_key="", sep="."):
+    items = {}
+    for k, v in d.items():
+        key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.update(flatten(v, key, sep))
+        else:
+            items[key] = v
+    return items
+
+
 def count_parameters(model: nn.Module) -> int:
     """Count the number of trainable parameters in a given model.
 

@@ -15,6 +15,8 @@ class WorldModelLoss:
         self.beta_prediction = config.world_model_loss.beta_prediction
         self.free_nats = config.world_model_loss.free_nats
         self.two_hot = TwoHot(low=config.two_hot.low, high=config.two_hot.high, n_bins=config.two_hot.n_bins)
+        # store subcomponents of loss in dictionary to log later
+        self.metrics = {}
 
     def calculate_kl_loss(self, input, target):
         loss = torch.nn.functional.kl_div(input, target=target, log_target=True, reduction="none")
@@ -80,4 +82,12 @@ class WorldModelLoss:
         posterior_loss = self.calculate_posterior_loss(observed_output)
         prediction_loss = self.calculate_prediction_loss(batch, observed_output)
         loss = prior_loss + posterior_loss + prediction_loss
+
+        # access this public field after forward call, in trainer.py
+        self.metrics = {
+            "world_model/prior": prior_loss.item(),
+            "world_model/posterior": posterior_loss.item(),
+            "world_model/prediction": prediction_loss.item(),
+            "loss/world_model": loss.item(),
+        }
         return loss

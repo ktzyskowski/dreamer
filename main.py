@@ -2,7 +2,7 @@ import logging
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import wandb
+import mlflow
 
 from src.models.actor import DiscreteActor
 from src.models.critic import Critic
@@ -10,19 +10,17 @@ from src.models.world_model import WorldModel
 from src.trainer import Trainer
 from src.util.buffer import ReplayBuffer
 from src.util.env import EnvironmentManager
-from src.util.functions import count_parameters
+from src.util.functions import count_parameters, flatten
 
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(config: DictConfig):
     # set up logging
     logging.basicConfig()
-    wandb.init(
-        project="dreamer",
-        config=OmegaConf.to_container(config, resolve=True),
-        settings=wandb.Settings(_disable_stats=True),
-        mode="offline",
-    )
+
+    mlflow.set_experiment("dreamer")
+    mlflow.start_run()
+    mlflow.log_params(flatten(OmegaConf.to_container(config, resolve=True)))
 
     # context manager automatically handles environment during training
     with EnvironmentManager(config) as env:
@@ -40,9 +38,9 @@ def main(config: DictConfig):
         logging.info("Critic # parameters: %d", count_parameters(critic))
 
         trainer = Trainer(env, world_model, actor, critic, replay_buffer, config)
-        trainer.train(env, n_steps=10_000)
+        trainer.train(env, n_steps=1_000_000)
 
-    wandb.finish()
+    mlflow.end_run()
 
 
 if __name__ == "__main__":

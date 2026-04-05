@@ -1,7 +1,7 @@
 import logging
 
 import torch
-import wandb
+import mlflow
 
 from src.loss.actor_critic_loss import ActorCriticLoss
 from src.loss.world_model_loss import WorldModelLoss
@@ -66,12 +66,23 @@ class Trainer:
 
     def _batch_to_device(self, batch):
         """Move a batch to the trainer device, and convert any inputs to tensors."""
-        batch_tensors = {k: torch.tensor(v, dtype=torch.float32).to(self.device) for k, v in batch.items()}
-        return batch_tensors
+        result = {}
+
+        for k, v in batch.items():
+            t = torch.tensor(v, dtype=torch.float32).to(self.device)
+            if k == "observations":
+                t = t / 255.0
+            result[k] = t
+
+        return result
+        # batch_tensors = {k: torch.tensor(v, dtype=torch.float32).to(self.device) for k, v in batch.items()}
+        # return batch_tensors
 
     def train(self, env, n_steps=256):
         """Train the world model and actor/critic networks."""
 
+        episode_reward = 0.0
+        episode_length = 0
         recurrent_state = torch.zeros(self.world_model.recurrent_size, device=self.device)
         observation = env.reset()
         for step in range(n_steps):
@@ -83,9 +94,22 @@ class Trainer:
             next_observation, reward, done = env.step(action_idx)
             self.replay_buffer.add(observation, action, reward, done)
 
+            episode_reward += reward
+            episode_length += 1
+
             if done:
                 recurrent_state = torch.zeros(self.world_model.recurrent_size, device=self.device)
                 observation = env.reset()
+
+                mlflow.log_metrics(
+                    {
+                        "env/episode_reward": episode_reward,
+                        "env/episode_length": episode_length,
+                    },
+                    step=step,
+                )
+                episode_reward = 0.0
+                episode_length = 0
             else:
                 recurrent_state = self.world_model.get_next_recurrent_state(full_state, action, recurrent_state)
                 observation = next_observation
@@ -125,22 +149,21 @@ class Trainer:
         self.critic_optimizer.step()
 
         # log metrics
-        wandb.log(
+        mlflow.log_metrics(
             {
-                "loss/world_model": world_model_loss.item(),
-                "loss/actor_critic": actor_critic_loss.item(),
+                **self.world_model_loss.metrics,
+                **self.actor_critic_loss.metrics,
             },
             step=self.gradient_step_counter,
         )
 
-        # log images (tensor shape: C, H, W or B, C, H, W)
-        if self.gradient_step_counter % 10 == 0:
-            wandb.log(
-                {
-                    "images/real": wandb.Image(batch["observations"][0, 0]),
-                    "images/reconstructed": wandb.Image(observed_output["reconstructed_observations"][0, 0]),
-                },
-                step=self.gradient_step_counter,
-            )
+        # def _to_hwc(observation):
+        #     return observation.cpu().detach().permute(1, 2, 0).numpy()
+
+        # # log images (tensor shape: C, H, W or B, C, H, W)
+        # if self.gradient_step_counter % 10 == 0:
+        #     mlflow.log_image(_to_hwc(batch["observations"][0, 0]), "real.png")
+        #     mlflow.log_image(_to_hwc(observed_output["reconstructed_observations"][0, 0]), "reconstructed.png")
+        
         self.gradient_step_counter += 1
-        logging.info("Gradient steps performed: %d", self.gradient_step_counter)
+        # logging.info("Gradient steps performed: %d", self.gradient_step_counter)
