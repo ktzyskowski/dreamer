@@ -4,6 +4,10 @@ replay_ratio: 32
 batch_size: 16
 sequence_length: 64
 
+torch:
+  # comment this out if unavailable on your machine
+  float32_matmul_precision: high
+
 environment:
   name: ALE/Breakout-v5
   action_repeat: 4

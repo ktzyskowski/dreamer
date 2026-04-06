@@ -1,12 +1,3 @@
-# TODO: observe() has a sequential Python loop over sequence_length timesteps. The GRU step
-# must remain sequential (each h_t depends on h_{t-1}), but the encoder, decoder, reward
-# predictor, and continue predictor are all independent across timesteps and could be applied
-# to all timesteps at once by flattening the sequence into the batch dimension before the loop
-# (encoder/decoder already support arbitrary leading dims). Restructure observe() to:
-#   1. Encode all timesteps at once: encoder(observations.flatten(0,1)).unflatten(0, (B, T))
-#   2. Loop only for the GRU hidden state updates
-#   3. Apply decoder/reward/continue predictors to all collected full_states at once after the loop
-
 from typing import Optional
 import typing
 

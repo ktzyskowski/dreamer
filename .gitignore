@@ -22,3 +22,6 @@ wandb/
 # MLflow
 mlflow.db
 mlruns/
+
+# Model artifacts
+checkpoints/

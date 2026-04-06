@@ -11,6 +11,7 @@ from src.models.world_model import WorldModel
 from src.util.buffer import ReplayBuffer
 from src.util.env import EnvironmentManager
 from src.util.functions import get_device
+from src.util.checkpoint import save_checkpoint
 
 
 class Trainer:
@@ -43,6 +44,11 @@ class Trainer:
         self.actor = actor.to(self.device)
         self.critic = critic.to(self.device)
 
+        # free speedup
+        self.world_model = torch.compile(self.world_model)
+        self.actor = torch.compile(self.actor)
+        self.critic = torch.compile(self.critic)
+
         # =================================================
         # optimizers
         self.world_model_optimizer = torch.optim.Adam(
@@ -68,7 +74,7 @@ class Trainer:
         result = {}
 
         for k, v in batch.items():
-            t = torch.tensor(v, dtype=torch.float32).to(self.device)
+            t = torch.from_numpy(v).to(dtype=torch.float32, device=self.device, non_blocking=True)
             if k == "observations":
                 t = t / 255.0
             result[k] = t
@@ -77,14 +83,15 @@ class Trainer:
         # batch_tensors = {k: torch.tensor(v, dtype=torch.float32).to(self.device) for k, v in batch.items()}
         # return batch_tensors
 
-    def train(self, env, n_steps=256):
+    def train(self, env, n_steps=256, start_step=0, start_gradient_step=0):
         """Train the world model and actor/critic networks."""
+        self.gradient_step_counter = start_gradient_step
 
         episode_reward = 0.0
         episode_length = 0
         recurrent_state = torch.zeros(self.world_model.recurrent_size, device=self.device)
         observation = env.reset()
-        for step in range(n_steps):
+        for step in range(start_step, start_step + n_steps):
             with torch.no_grad():
                 encoded_observation = self.world_model.encoder(observation.to(self.device))
                 full_state, _ = self.world_model.get_full_state(encoded_observation, recurrent_state)
@@ -118,6 +125,20 @@ class Trainer:
             if step >= self.warmup_steps and step % self.replay_ratio == 0:
                 self.gradient_step()
 
+            # checkpoint occasionally
+            if self.gradient_step_counter % 1_000 == 0:
+                save_checkpoint(
+                    f"checkpoints/checkpoint_{self.gradient_step_counter:06d}.pt",
+                    self.world_model,
+                    self.actor,
+                    self.critic,
+                    self.world_model_optimizer,
+                    self.actor_optimizer,
+                    self.critic_optimizer,
+                    step,
+                    self.gradient_step_counter,
+                )
+
     def gradient_step(self):
         batch = self.replay_buffer.sample(batch_size=self.batch_size, sequence_length=self.sequence_length)
         batch = self._batch_to_device(batch)
@@ -129,6 +150,7 @@ class Trainer:
         observed_output = self.world_model.observe(batch)
         world_model_loss = self.world_model_loss(batch, observed_output)
         world_model_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.world_model.parameters(), 1000)
         self.world_model_optimizer.step()
 
         # ======================================================= #
@@ -145,6 +167,8 @@ class Trainer:
         actor_critic_loss = self.actor_critic_loss(dream_output, self.critic)
         actor_critic_loss.backward()
 
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1000)
+        torch.nn.utils.clip_grad_norm_(self.critic.fast.parameters(), 1000)
         self.actor_optimizer.step()
         self.critic_optimizer.step()
         self.critic.update_slow()
