@@ -1,5 +1,21 @@
 from torch import nn
 
+from src.nets.mlp import MultiLayerPerceptron
+
+
+class MLPEncoder(nn.Module):
+    def __init__(self, input_size: int, output_size: int, hidden_dims: list):
+        super().__init__()
+        self.output_size = output_size
+        self.net = MultiLayerPerceptron(
+            input_dim=input_size,
+            hidden_dims=hidden_dims,
+            output_dim=output_size,
+        )
+
+    def forward(self, observation):
+        return self.net(observation)
+
 
 def conv2d_output_size(input_size: int, kernel_size: int, stride: int, padding: int):
     output_size = (input_size + 2 * padding - kernel_size) // stride + 1

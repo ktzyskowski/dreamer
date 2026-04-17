@@ -39,7 +39,7 @@ def main(config: DictConfig):
         observation_shape = env.observation_space.shape
         assert observation_shape is not None
 
-        replay_buffer = ReplayBuffer(observation_shape, action_size, config)
+        replay_buffer = ReplayBuffer(observation_shape, action_size, config.replay_buffer.capacity, dtype=config.replay_buffer.dtype)
         world_model = WorldModel(observation_shape, action_size, config)
         actor = DiscreteActor(world_model.full_state_size, action_size, config)
         critic = DualCritic(world_model.full_state_size, config)
@@ -67,7 +67,7 @@ def main(config: DictConfig):
             start_gradient_step = checkpoint["gradient_step"]
             logging.info("Resumed from checkpoint: %s (step=%d)", config.checkpoint_path, start_step)
 
-        trainer.train(env, n_steps=1_000_000, start_step=start_step, start_gradient_step=start_gradient_step)
+        trainer.train(env, n_steps=10_000_000, start_step=start_step, start_gradient_step=start_gradient_step)
 
     mlflow.end_run()
 

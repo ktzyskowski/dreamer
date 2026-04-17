@@ -57,7 +57,7 @@ class WorldModelLoss:
 
         observations = batch["observations"]
         reconstructed_observations = observed_output["reconstructed_observations"]
-        observation_loss = F.mse_loss(observations, reconstructed_observations)
+        observation_loss = F.mse_loss(symlog(observations), symlog(reconstructed_observations))
 
         dones = batch["dones"]
         predicted_continue_logits = observed_output["predicted_continue_logits"].squeeze(-1)
@@ -75,19 +75,25 @@ class WorldModelLoss:
 
         loss = observation_loss + continue_loss + reward_loss
         loss = self.beta_prediction * loss
+
+        self.metrics["world_model/obs_loss"] = observation_loss.item()
+        self.metrics["world_model/continue_loss"] = continue_loss.item()
+        self.metrics["world_model/reward_loss"] = reward_loss.item()
+
         return loss
 
     def __call__(self, batch: WorldModelInput, observed_output: ObservedOutput):
+        self.metrics = {}
+
         prior_loss = self.calculate_prior_loss(observed_output)
         posterior_loss = self.calculate_posterior_loss(observed_output)
         prediction_loss = self.calculate_prediction_loss(batch, observed_output)
         loss = prior_loss + posterior_loss + prediction_loss
 
         # access this public field after forward call, in trainer.py
-        self.metrics = {
-            "world_model/prior": prior_loss.item(),
-            "world_model/posterior": posterior_loss.item(),
-            "world_model/prediction": prediction_loss.item(),
-            "loss/world_model": loss.item(),
-        }
+        self.metrics["world_model/prior"] = prior_loss.item()
+        self.metrics["world_model/posterior"] = posterior_loss.item()
+        self.metrics["world_model/prediction"] = prediction_loss.item()
+        self.metrics["loss/world_model"] = loss.item()
+
         return loss

@@ -53,6 +53,7 @@ class BlockDiagonalGRU(nn.Module):
                 )
             ]
         )
+        self.layer_norm = nn.LayerNorm(recurrent_size)
 
     def forward(self, x, h):
         """
@@ -72,4 +73,4 @@ class BlockDiagonalGRU(nn.Module):
         ]
         # concatenate chunk outputs of each GRU cell back together
         new_h = torch.cat(new_h_blocks, dim=-1)
-        return new_h
+        return self.layer_norm(new_h)

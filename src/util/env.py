@@ -13,8 +13,10 @@ from omegaconf import DictConfig
 class EnvironmentManager:
     def __init__(self, config: DictConfig):
         self.name = config.environment.name
+        self.env_type = config.environment.type  # "atari" or "vector"
         self.action_repeat = config.environment.action_repeat
-        self.obs_shape = (config.environment.obs_height, config.environment.obs_width)
+        if self.env_type == "atari":
+            self.obs_shape = (config.environment.obs_height, config.environment.obs_width)
         self._env = None
 
     @property
@@ -38,35 +40,36 @@ class EnvironmentManager:
         raise ValueError("Unsupported action space.")
 
     def __enter__(self):
-        if self.name.startswith("ALE/"):
+        if self.env_type == "atari":
             import ale_py
 
             gym.register_envs(ale_py)
+            self._env = gym.make(self.name)
 
-        self._env = gym.make(self.name)
+            # downsize images
+            self._env = ResizeObservation(self._env, self.obs_shape)
 
-        # downsize images
-        self._env = ResizeObservation(self._env, self.obs_shape)
-
-        # change dtype from uint8 to float32 and downscale from 0,255 to 0,1
-        self._env = DtypeObservation(self._env, dtype=np.float32)
-        self._env = RescaleObservation(
-            self._env, min_obs=np.float32(0.0), max_obs=np.float32(1.0)
-        )
-
-        # CNN expects (channel, height, width), not (height, width, channel)
-        old_observation_space = self._env.observation_space
-        if isinstance(old_observation_space, gym.spaces.Box):
-            new_observation_space = gym.spaces.Box(
-                low=np.moveaxis(old_observation_space.low, -1, 0),
-                high=np.moveaxis(old_observation_space.high, -1, 0),
-                dtype=old_observation_space.dtype.type,
+            # change dtype from uint8 to float32 and downscale from 0,255 to 0,1
+            self._env = DtypeObservation(self._env, dtype=np.float32)
+            self._env = RescaleObservation(
+                self._env, min_obs=np.float32(0.0), max_obs=np.float32(1.0)
             )
-            self._env = TransformObservation(
-                self._env,
-                lambda observation: np.moveaxis(observation, -1, 0),
-                new_observation_space,
-            )
+
+            # CNN expects (channel, height, width), not (height, width, channel)
+            old_observation_space = self._env.observation_space
+            if isinstance(old_observation_space, gym.spaces.Box):
+                new_observation_space = gym.spaces.Box(
+                    low=np.moveaxis(old_observation_space.low, -1, 0),
+                    high=np.moveaxis(old_observation_space.high, -1, 0),
+                    dtype=old_observation_space.dtype.type,
+                )
+                self._env = TransformObservation(
+                    self._env,
+                    lambda observation: np.moveaxis(observation, -1, 0),
+                    new_observation_space,
+                )
+        else:
+            self._env = gym.make(self.name)
 
         # wrapping env in torch makes our lives easier, less manual conversions
         self._env = NumpyToTorch(self._env)

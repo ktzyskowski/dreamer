@@ -5,8 +5,8 @@ import torch
 from torch import Tensor, nn
 
 from src.data import DreamOutput, ObservedOutput, WorldModelInput
-from src.nets.decoder import Decoder
-from src.nets.encoder import Encoder
+from src.nets.decoder import Decoder, MLPDecoder
+from src.nets.encoder import Encoder, MLPEncoder
 from src.nets.mlp import MultiLayerPerceptron
 from src.nets.rnn import BlockDiagonalGRU
 from src.util.multi_categorical import MultiCategorical
@@ -29,20 +29,32 @@ class WorldModel(nn.Module):
         self.full_state_size = self.latent_size + self.recurrent_size
 
         # subnetworks
-        self.encoder = Encoder(
-            observation_shape=observation_shape,
-            output_size=self.latent_size,
-            kernel_size=config.world_model.encoder.kernel_size,
-            stride=config.world_model.encoder.stride,
-            padding=config.world_model.encoder.padding,
-        )
-        self.decoder = Decoder(
-            observation_shape=observation_shape,
-            input_dim=self.full_state_size,
-            kernel_size=config.world_model.encoder.kernel_size,
-            stride=config.world_model.encoder.stride,
-            padding=config.world_model.encoder.padding,
-        )
+        if len(observation_shape) == 1:
+            self.encoder = MLPEncoder(
+                input_size=observation_shape[0],
+                output_size=self.latent_size,
+                hidden_dims=config.world_model.encoder.hidden_dims,
+            )
+            self.decoder = MLPDecoder(
+                input_dim=self.full_state_size,
+                output_size=observation_shape[0],
+                hidden_dims=config.world_model.encoder.hidden_dims,
+            )
+        else:
+            self.encoder = Encoder(
+                observation_shape=observation_shape,
+                output_size=self.latent_size,
+                kernel_size=config.world_model.encoder.kernel_size,
+                stride=config.world_model.encoder.stride,
+                padding=config.world_model.encoder.padding,
+            )
+            self.decoder = Decoder(
+                observation_shape=observation_shape,
+                input_dim=self.full_state_size,
+                kernel_size=config.world_model.encoder.kernel_size,
+                stride=config.world_model.encoder.stride,
+                padding=config.world_model.encoder.padding,
+            )
         self.posterior_net = MultiLayerPerceptron(
             input_dim=self.full_state_size,
             hidden_dims=config.world_model.posterior_net.hidden_dims,
@@ -127,6 +139,7 @@ class WorldModel(nn.Module):
         # batch encode observations outside of loop
         encoded_observations = self.encoder(observations)
         actions = batch["actions"]
+        dones = batch["dones"]
         batch_size, sequence_length = observations.shape[0], observations.shape[1]
 
         # initialize recurrent state to zero tensors
@@ -159,7 +172,9 @@ class WorldModel(nn.Module):
             observed_output["recurrent_states"].append(recurrent_state)
             observed_output["posterior_log_probs"].append(posterior_log_probs)
             observed_output["prior_log_probs"].append(prior_log_probs)
-            recurrent_state = next_recurrent_state
+            # reset recurrent state for sequences that just crossed an episode boundary
+            not_done = (~dones[:, t].bool()).unsqueeze(-1)
+            recurrent_state = next_recurrent_state * not_done
 
         # stack all model outputs in sequence dimension
         for key in observed_output.keys():

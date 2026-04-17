@@ -1,19 +1,23 @@
 device: cuda
 warmup_steps: 1_024
-replay_ratio: 32
-batch_size: 16
-sequence_length: 64
+replay_ratio: 4
+batch_size: 32
+sequence_length: 32
 
 torch:
   # comment this out if unavailable on your machine
   float32_matmul_precision: high
 
 environment:
-  name: ALE/Breakout-v5
-  action_repeat: 4
-  # resize observations
-  obs_width: 64
-  obs_height: 64
+  # name: ALE/Breakout-v5
+  # action_repeat: 4
+  # # resize observations
+  # obs_width: 64
+  # obs_height: 64
+
+  name: CartPole-v1
+  type: vector # "atari" or "vector"
+  action_repeat: 1
 
 two_hot:
   n_bins: 255
@@ -23,42 +27,45 @@ two_hot:
 replay_buffer:
   capacity: 1_000_000
   # capacity: 5_000_000
-  dtype: uint8
+  dtype: float32
 
 # Models ========================================================== #
 
 world_model:
   learning_rate: 3e-4
   dream_horizon: 15
-  n_dreams: 16
+  n_dreams: 64
 
   recurrent_size: 128
-  n_categoricals: 32
-  n_classes: 32
+  n_categoricals: 16
+  n_classes: 16
 
   encoder:
+    # used for atari (cnn)
     kernel_size: 3
     stride: 2
     padding: 0
+    # used for vector envs (mlp)
+    hidden_dims: [ 128, 128 ]
   posterior_net:
-    hidden_dims: [128, 128]
+    hidden_dims: [ 128, 128 ]
   prior_net:
-    hidden_dims: [128, 128]
+    hidden_dims: [ 128, 128 ]
   reward_predictor:
-    hidden_dims: [128, 128]
+    hidden_dims: [ 128, 128 ]
   continue_predictor:
-    hidden_dims: [128, 128]
+    hidden_dims: [ 128, 128 ]
   recurrent_model:
     n_blocks: 8
 
 actor:
   learning_rate: 3e-4
-  hidden_dims: [128, 128]
+  hidden_dims: [ 128, 128 ]
 
 critic:
   learning_rate: 1e-4
   ema_decay: 0.98
-  hidden_dims: [128, 128]
+  hidden_dims: [ 128, 128 ]
 
 # Loss Functions ================================================== #
 
@@ -73,10 +80,10 @@ actor_critic_loss:
   ema_decay: 0.99
 
   # entropy regularization
-  eta: 1e-2
+  eta: 5e-2
 
   # trace decay factor
   lamda: 0.95
 
   # discount factor
-  gamma: 0.997
+  gamma: 0.99

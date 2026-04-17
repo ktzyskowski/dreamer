@@ -1,6 +1,22 @@
 from torch import nn
 
 from .encoder import conv2d_output_size
+from src.nets.mlp import MultiLayerPerceptron
+
+
+class MLPDecoder(nn.Module):
+    def __init__(self, input_dim: int, output_size: int, hidden_dims: list):
+        super().__init__()
+        self.input_dim = input_dim
+        self.output_size = output_size
+        self.net = MultiLayerPerceptron(
+            input_dim=input_dim,
+            hidden_dims=hidden_dims,
+            output_dim=output_size,
+        )
+
+    def forward(self, latent):
+        return self.net(latent)
 
 
 # TODO: output_padding is hardcoded to 1 on the last ConvTranspose2d layer to recover the pixel

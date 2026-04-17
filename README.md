@@ -23,3 +23,9 @@ Although the pipeline is non-existant at this point in the project, to run the m
 ```zsh
 uv run main.py --config-name=config
 ```
+
+To get total LoC (out of curiosity) you can use this command:
+
+```zsh
+find . -name "*.py" -not -path "./.venv/*" | xargs wc -l | sort -rn
+```

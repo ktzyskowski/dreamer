@@ -33,6 +33,7 @@ class Trainer:
         self.device = get_device(priority=config.device)
         logging.info("Using device %s", self.device)
 
+        self.pixel_obs = len(env.observation_space.shape) > 1
         self.warmup_steps = config.warmup_steps
         self.replay_ratio = config.replay_ratio
         self.batch_size = config.batch_size
@@ -75,7 +76,7 @@ class Trainer:
 
         for k, v in batch.items():
             t = torch.from_numpy(v).to(dtype=torch.float32, device=self.device, non_blocking=True)
-            if k == "observations":
+            if k == "observations" and self.pixel_obs:
                 t = t / 255.0
             result[k] = t
 
@@ -126,7 +127,7 @@ class Trainer:
                 self.gradient_step()
 
             # checkpoint occasionally
-            if self.gradient_step_counter % 1_000 == 0:
+            if self.gradient_step_counter > 0 and self.gradient_step_counter % 1_000 == 0:
                 save_checkpoint(
                     f"checkpoints/checkpoint_{self.gradient_step_counter:06d}.pt",
                     self.world_model,
@@ -175,14 +176,15 @@ class Trainer:
 
         # ======================================================= #
 
-        # log metrics
-        mlflow.log_metrics(
-            {
-                **self.world_model_loss.metrics,
-                **self.actor_critic_loss.metrics,
-            },
-            step=self.gradient_step_counter,
-        )
+        # log metrics every 10 gradient steps
+        if self.gradient_step_counter % 10 == 0:
+            mlflow.log_metrics(
+                {
+                    **self.world_model_loss.metrics,
+                    **self.actor_critic_loss.metrics,
+                },
+                step=self.gradient_step_counter,
+            )
 
         self.gradient_step_counter += 1
         if self.gradient_step_counter % 25 == 0:
