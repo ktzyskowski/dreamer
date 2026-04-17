@@ -4,12 +4,12 @@ import typing
 import torch
 from torch import Tensor, nn
 
-from src.data import DreamOutput, ObservedOutput, WorldModelInput
+from data.data import DreamOutput, ObservedOutput, WorldModelInput
 from src.nets.decoder import Decoder, MLPDecoder
 from src.nets.encoder import Encoder, MLPEncoder
 from src.nets.mlp import MultiLayerPerceptron
 from src.nets.rnn import BlockDiagonalGRU
-from src.util.multi_categorical import MultiCategorical
+from rl.multi_categorical import MultiCategorical
 
 
 class WorldModel(nn.Module):

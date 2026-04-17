@@ -1,15 +1,17 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
-from src.data import ObservedOutput, WorldModelInput
+from data.data import ObservedOutput, WorldModelInput
 from src.util.functions import symlog
 from src.util.two_hot import TwoHot
 
 
-class WorldModelLoss:
+class WorldModelLoss(nn.Module):
     # Eq (2) from paper
 
     def __init__(self, config):
+        super().__init__()
         self.beta_posterior = config.world_model_loss.beta_posterior
         self.beta_prior = config.world_model_loss.beta_prior
         self.beta_prediction = config.world_model_loss.beta_prediction
@@ -21,11 +23,13 @@ class WorldModelLoss:
     def calculate_kl_loss(self, input, target):
         loss = torch.nn.functional.kl_div(input, target=target, log_target=True, reduction="none")
         # sum KL over classes, per categorical
-        loss = loss.sum(-1)
-        # clip KL per categorical
-        loss = torch.max(torch.full_like(loss, self.free_nats), loss)
-        # sum over clipped categoricals, take mean per batch
-        loss = loss.sum(-1).mean()
+        loss = loss.sum(-1).sum(-1)
+
+        # free nats clamping
+        loss = torch.clamp(loss, min=self.free_nats)
+
+        # take mean over batch
+        loss = loss.mean()
         return loss
 
     def calculate_prior_loss(self, observed_output: ObservedOutput):

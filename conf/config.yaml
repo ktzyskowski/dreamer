@@ -87,3 +87,6 @@ actor_critic_loss:
 
   # discount factor
   gamma: 0.99
+
+  # critic regularization toward slow critic (Hafner et al., DreamerV3)
+  slow_reg: 1.0

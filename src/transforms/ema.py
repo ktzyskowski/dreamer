@@ -1,8 +1,10 @@
-from torch import nn
 import torch
+import torch.nn as nn
 
 
 class ExpMovingAverage(nn.Module):
+    """Exponential moving average transform."""
+
     def __init__(self, decay: float):
         super().__init__()
         self.decay = decay

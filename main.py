@@ -5,11 +5,11 @@ from omegaconf import DictConfig, OmegaConf
 import mlflow
 import torch
 
-from src.models.actor import DiscreteActor
-from src.models.critic import DualCritic
-from src.models.world_model import WorldModel
+from agent.actor import DiscreteActor
+from agent.critic import DualCritic
+from world_model.world_model import WorldModel
 from src.trainer import Trainer
-from src.util.buffer import ReplayBuffer
+from data.buffer import ReplayBuffer
 from src.util.env import EnvironmentManager
 from src.util.functions import count_parameters, flatten
 from src.util.checkpoint import load_checkpoint
