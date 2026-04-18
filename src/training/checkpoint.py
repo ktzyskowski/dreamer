@@ -2,6 +2,8 @@ import os
 from typing import Any
 
 import torch
+import torch.optim as optim
+import torch.nn as nn
 
 
 class CheckpointManager:
@@ -14,7 +16,7 @@ class CheckpointManager:
     def __init__(
         self,
         directory: str,
-        modules: dict[str, Any],
+        modules: dict[str, nn.Module | optim.Optimizer],
         save_every_n_gradient_steps: int = 1_000,
     ):
         self.directory = directory

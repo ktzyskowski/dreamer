@@ -15,15 +15,16 @@ class ExpMovingAverage(nn.Module):
         self.decay = decay
         self.register_buffer("average", torch.tensor(0.0))
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         """Transform the given input through the EMA.
 
         The average is updated according to the EMA definition, and returned.
 
         Args:
-            x (float): the given input.
+            x (torch.Tensor): the given input.
         Returns:
-            average (float): the updated EMA value.
+            average (torch.Tensor): the updated EMA value.
         """
+        assert self.average.shape == x.shape
         self.average = self.decay * self.average + (1 - self.decay) * x
         return self.average

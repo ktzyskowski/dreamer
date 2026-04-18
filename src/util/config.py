@@ -121,7 +121,9 @@ class Config:
     actor: ActorConfig = field(default_factory=ActorConfig)
     critic: CriticConfig = field(default_factory=CriticConfig)
     world_model_loss: WorldModelLossConfig = field(default_factory=WorldModelLossConfig)
-    actor_critic_loss: ActorCriticLossConfig = field(default_factory=ActorCriticLossConfig)
+    actor_critic_loss: ActorCriticLossConfig = field(
+        default_factory=ActorCriticLossConfig
+    )
 
 
 def _build(cls: type, data: Any) -> Any:

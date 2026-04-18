@@ -6,3 +6,6 @@ class Dreamer(nn.Module):
         super().__init__()
         self.dream_horizon = dream_horizon
         self.n_dreams = n_dreams
+
+    def dream(self):
+        pass

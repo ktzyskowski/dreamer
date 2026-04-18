@@ -118,8 +118,12 @@ class ReplayBuffer:
         if len(start_index_pool) < batch_size:
             raise ValueError("Batch size could not be fulfilled.")
 
-        start_indices = np.random.choice(start_index_pool, size=batch_size, replace=False)
-        indices = (start_indices[:, np.newaxis] + np.arange(sequence_length)) % self.capacity
+        start_indices = np.random.choice(
+            start_index_pool, size=batch_size, replace=False
+        )
+        indices = (
+            start_indices[:, np.newaxis] + np.arange(sequence_length)
+        ) % self.capacity
 
         batch_observations = self.observations[indices]
         batch_actions = self.actions[indices]

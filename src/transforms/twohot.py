@@ -17,7 +17,7 @@ def symlog(x: torch.Tensor) -> torch.Tensor:
 
 
 def symexp(x: torch.Tensor) -> torch.Tensor:
-    """Compute sympexp function.
+    """Compute symexp function.
 
     Eq (9) in paper.
 
@@ -39,6 +39,7 @@ class SymlogTwoHot(nn.Module):
         self.high = high
         self.n_bins = n_bins
 
+        self.bins: torch.Tensor
         self.register_buffer("bins", torch.linspace(self.low, self.high, self.n_bins))
 
     def encode(self, y):
@@ -57,7 +58,9 @@ class SymlogTwoHot(nn.Module):
         k = k.clamp(0, self.n_bins - 2)
 
         # bin weights (1.0 split between two bins: upper and lower)
-        upper_weight = torch.abs(self.bins[k] - y) / torch.abs(self.bins[k + 1] - self.bins[k])
+        upper_weight = torch.abs(self.bins[k] - y) / torch.abs(
+            self.bins[k + 1] - self.bins[k]
+        )
         lower_weight = 1.0 - upper_weight
 
         # scatter weights into new tensor with added bin dimension: (*, bins)

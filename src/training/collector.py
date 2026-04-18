@@ -1,5 +1,11 @@
+from src.env.base import BaseEnv
+
+
 class Collector:
-    def __init__(self):
+    def __init__(self, env: BaseEnv):
+        pass
+
+    def step(self):
         pass
 
 

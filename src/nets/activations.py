@@ -3,6 +3,8 @@ import torch.nn.functional as F
 
 
 class RMSNormSiLU(nn.Module):
+    """RMSNorm + SiLU activation module."""
+
     def __init__(self):
         super().__init__(self)
 
