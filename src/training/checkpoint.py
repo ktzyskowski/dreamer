@@ -1,19 +1,20 @@
 import os
+from typing import Any
 
 import torch
-import torch.nn as nn
 
 
 class CheckpointManager:
     """Checkpoint manager class.
 
     Saves and loads training state, including models and step counters.
+    Values in `modules` may be any state-dict provider (nn.Module, Optimizer).
     """
 
     def __init__(
         self,
         directory: str,
-        modules: dict[str, nn.Module],
+        modules: dict[str, Any],
         save_every_n_gradient_steps: int = 1_000,
     ):
         self.directory = directory
@@ -34,7 +35,7 @@ class CheckpointManager:
 
     def save(self, path: str, step: int, gradient_step: int):
         payload = {
-            **{key: module.state_dict() for key, module in self.modules},
+            **{key: module.state_dict() for key, module in self.modules.items()},
             "step": step,
             "gradient_step": gradient_step,
         }
@@ -43,8 +44,7 @@ class CheckpointManager:
     def load(self, path: str, device: str) -> dict:
         checkpoint = torch.load(path, map_location=device)
         for key, module in self.modules.items():
-            state_dict = checkpoint[key]
-            module.load_state_dict(state_dict)
+            module.load_state_dict(checkpoint[key])
         return {
             "step": checkpoint["step"],
             "gradient_step": checkpoint["gradient_step"],

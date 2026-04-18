@@ -1,76 +1,63 @@
 import logging
+from dataclasses import asdict
 
-import hydra
-from omegaconf import DictConfig, OmegaConf
-import mlflow
 import torch
 
 from agent.actor import DiscreteActor
 from agent.critic import DualCritic
-from world_model.world_model import WorldModel
-from src.trainer import Trainer
+from world_model import WorldModel
+from src.training.trainer import Trainer
+from src.training.metrics import MetricsAggregator
 from data.buffer import ReplayBuffer
 from src.util.env import EnvironmentManager
-from src.util.functions import count_parameters, flatten
-from src.util.checkpoint import load_checkpoint
 
-import os
+from src.config import Config, load_config
+from src.util.config import count_parameters, flatten
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="config")
-def main(config: DictConfig):
-    # create checkpoint folder if not exists
-    os.makedirs("checkpoints", exist_ok=True)
+def main(config: Config):
+    logging.basicConfig()
 
     # faster performance on tensor cores if available
-    if "float32_matmul_precision" in config.torch:
+    if config.torch.float32_matmul_precision is not None:
         torch.set_float32_matmul_precision(config.torch.float32_matmul_precision)
 
-    # set up logging
-    logging.basicConfig()
-    mlflow.set_experiment("dreamer")
-    mlflow.start_run(log_system_metrics=True)
-    mlflow.log_params(flatten(OmegaConf.to_container(config, resolve=True)))
+    with MetricsAggregator(experiment_name="dreamer") as metrics, EnvironmentManager(config) as env:
+        metrics.log_params(flatten(asdict(config)))
+        # metrics.log_params({"world_model_parameters": count_parameters(...)})
 
-    # context manager automatically handles environment during training
-    with EnvironmentManager(config) as env:
-        # extract observation/action sizes from environment
-        action_size = env.action_size
-        observation_shape = env.observation_space.shape
-        assert observation_shape is not None
+    # metrics = MetricsAggregator(experiment_name="dreamer")
+    # with metrics:
+    #     metrics.log_params(flatten(asdict(config)))
 
-        replay_buffer = ReplayBuffer(observation_shape, action_size, config.replay_buffer.capacity, dtype=config.replay_buffer.dtype)
-        world_model = WorldModel(observation_shape, action_size, config)
-        actor = DiscreteActor(world_model.full_state_size, action_size, config)
-        critic = DualCritic(world_model.full_state_size, config)
-        logging.info("World model # parameters: %d", count_parameters(world_model))
-        logging.info("Actor # parameters: %d", count_parameters(actor))
-        logging.info("Critic # parameters: %d", count_parameters(critic))
+    #     # context manager automatically handles environment during training
+    #     with EnvironmentManager(config) as env:
+    #         # extract observation/action sizes from environment
+    #         action_size = env.action_size
+    #         observation_shape = env.observation_space.shape
+    #         assert observation_shape is not None
 
-        trainer = Trainer(env, world_model, actor, critic, replay_buffer, config)
+    #         replay_buffer = ReplayBuffer(observation_shape, action_size, config.replay_buffer.capacity, dtype=config.replay_buffer.dtype)
+    #         world_model = WorldModel(observation_shape, action_size, config)
+    #         actor = DiscreteActor(world_model.full_state_size, action_size, config)
+    #         critic = DualCritic(world_model.full_state_size, config)
+    #         logging.info("World model # parameters: %d", count_parameters(world_model))
+    #         logging.info("Actor # parameters: %d", count_parameters(actor))
+    #         logging.info("Critic # parameters: %d", count_parameters(critic))
 
-        # load from checkpoint if specified
-        start_step = 0
-        start_gradient_step = 0
-        if "checkpoint_path" in config and config.checkpoint_path is not None:
-            checkpoint = load_checkpoint(
-                config.checkpoint_path,
-                world_model,
-                actor,
-                critic,
-                trainer.world_model_optimizer,
-                trainer.actor_optimizer,
-                trainer.critic_optimizer,
-                trainer.device,
-            )
-            start_step = checkpoint["step"]
-            start_gradient_step = checkpoint["gradient_step"]
-            logging.info("Resumed from checkpoint: %s (step=%d)", config.checkpoint_path, start_step)
+    #         trainer = Trainer(env, world_model, actor, critic, replay_buffer, metrics, config)
 
-        trainer.train(env, n_steps=10_000_000, start_step=start_step, start_gradient_step=start_gradient_step)
+    #         # load from checkpoint if specified
+    #         start_step = 0
+    #         start_gradient_step = 0
+    #         if config.checkpoint_path is not None:
+    #             checkpoint = trainer.checkpointer.load(config.checkpoint_path, trainer.device)
+    #             start_step = checkpoint["step"]
+    #             start_gradient_step = checkpoint["gradient_step"]
+    #             logging.info("Resumed from checkpoint: %s (step=%d)", config.checkpoint_path, start_step)
 
-    mlflow.end_run()
+    #         trainer.train(n_steps=10_000_000, start_step=start_step, start_gradient_step=start_gradient_step)
 
 
 if __name__ == "__main__":
-    main()
+    main(load_config())

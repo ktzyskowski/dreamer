@@ -1,3 +1,5 @@
+from typing import Any
+
 import mlflow
 
 
@@ -24,6 +26,9 @@ class MetricsAggregator:
 
     def log(self, metrics: dict[str, float], step: int):
         mlflow.log_metrics(metrics, step=step)
+
+    def log_params(self, params: dict[str, Any]):
+        mlflow.log_params(params)
 
     def __enter__(self):
         mlflow.set_experiment(self.experiment_name)

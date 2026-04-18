@@ -34,7 +34,7 @@ class SymlogTwoHot(nn.Module):
     """Symlog two-hot transform module."""
 
     def __init__(self, low: float, high: float, n_bins: int):
-        super().__init__(self)
+        super().__init__()
         self.low = low
         self.high = high
         self.n_bins = n_bins
