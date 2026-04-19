@@ -5,7 +5,12 @@ import torch.nn as nn
 
 from src.nets.mlp import MultiLayerPerceptron
 from src.nets.rnn import BlockDiagonalGRU
-from src.rl.multi_categorical import MultiCategorical
+from src.util.probability import multi_categorical
+
+
+def get_full_state(latent_state: torch.Tensor, recurrent_state: torch.Tensor):
+    full_state = torch.cat([recurrent_state, latent_state], dim=-1)
+    return full_state
 
 
 class WorldModel(nn.Module):
@@ -18,7 +23,7 @@ class WorldModel(nn.Module):
         n_categoricals: int,
         n_classes: int,
         activation: Type[nn.Module],
-        n_blocks: int,
+        n_recurrent_blocks: int,
     ):
         """Construct a new world model.
 
@@ -61,13 +66,26 @@ class WorldModel(nn.Module):
 
         # h' = f(z, h, a)
         self.recurrent_net = BlockDiagonalGRU(
-            input_size=self.full_state_size + action_size,
-            recurrent_size=recurrent_size,
-            n_blocks=n_blocks,
+            input_size=self.latent_size + action_size,
+            recurrent_size=self.recurrent_size,
+            n_blocks=n_recurrent_blocks,
         )
 
-    def step(self):
-        pass
+    def get_posterior_latent_state(self, encoded_observation: torch.Tensor, recurrent_state: torch.Tensor):
+        logits = self.posterior_net(torch.cat([recurrent_state, encoded_observation], dim=-1))
+        posterior = multi_categorical(logits, self.n_categoricals, self.n_classes)
+        latent_state = posterior.sample().flatten(-2)
+        return latent_state
+
+    def get_prior_latent_state(self, recurrent_state: torch.Tensor):
+        logits = self.prior_net(recurrent_state)
+        prior = multi_categorical(logits, self.n_categoricals, self.n_classes)
+        latent_state = prior.sample().flatten(-2)
+        return latent_state
+
+    def step(self, latent_state: torch.Tensor, recurrent_state: torch.Tensor, action: torch.Tensor):
+        next_recurrent_state = self.recurrent_net(torch.cat([latent_state, action], dim=-1), recurrent_state)
+        return next_recurrent_state
 
     def forward(
         self,
@@ -93,33 +111,23 @@ class WorldModel(nn.Module):
         output = {
             "full_states": [],
             "recurrent_states": [],
-            "posterior_log_probs": [],
+            "posterior_logits": [],
         }
 
         # initial recurrent state is a zero tensor
-        recurrent_state = torch.zeros(
-            (batch_size, self.recurrent_size), device=encoded_observations.device
-        )
+        recurrent_state = torch.zeros((batch_size, self.recurrent_size), device=encoded_observations.device)
 
-        # iterate through each time step to collect recurrent states, and posterior/prior log probs
+        # iterate through each time step to collect recurrent states and posterior logits
         for t in range(sequence_length):
-            posterior = MultiCategorical(
-                logits=self.posterior_net(
-                    torch.cat([recurrent_state, encoded_observations[:, t]], dim=-1)
-                ),
-                n_categoricals=self.n_categoricals,
-                n_classes=self.n_classes,
-            )
-            latent_state = posterior.sample()
-            full_state = torch.cat([recurrent_state, latent_state], dim=-1)
-            next_recurrent_state = self.recurrent_net(
-                torch.cat([full_state, actions[:, t]], dim=-1), recurrent_state
-            )
-            posterior_log_probs = posterior.log_probs
+            posterior_logits = self.posterior_net(torch.cat([recurrent_state, encoded_observations[:, t]], dim=-1))
+            posterior = multi_categorical(posterior_logits, self.n_categoricals, self.n_classes)
+            latent_state = posterior.sample().flatten(-2)
+            full_state = get_full_state(latent_state, recurrent_state)
+            next_recurrent_state = self.step(latent_state, recurrent_state, actions[:, t])
 
             output["full_states"].append(full_state)
             output["recurrent_states"].append(recurrent_state)
-            output["posterior_log_probs"].append(posterior_log_probs)
+            output["posterior_logits"].append(posterior_logits)
 
             # reset recurrent state at episode boundaries
             not_done = (~dones[:, t].bool()).unsqueeze(-1)
@@ -128,16 +136,10 @@ class WorldModel(nn.Module):
         # stack all model outputs in sequence dimension
         output = {key: torch.stack(output[key], dim=1) for key in output.keys()}
 
-        # prior is not used for sampling latent states, just log-probs;
-        # we can compute them all at once outside the loop once we have
+        # prior is not used for sampling latent states, just for KL;
+        # we can compute logits all at once outside the loop once we have
         # the recurrent states for each timestep.
-        prior = MultiCategorical(
-            logits=self.prior_net(output["recurrent_states"]),
-            n_categoricals=self.n_categoricals,
-            n_classes=self.n_classes,
-        )
-        prior_log_probs = prior.log_probs
-        output["prior_log_probs"] = prior_log_probs
+        output["prior_logits"] = self.prior_net(output["recurrent_states"])
 
         return output
 

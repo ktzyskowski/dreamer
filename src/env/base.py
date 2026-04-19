@@ -50,9 +50,7 @@ class BaseEnv(ABC):
         done = False
 
         for _ in range(self.action_repeat):
-            observation, step_reward, step_done, step_truncated, _ = self._env.step(
-                action
-            )
+            observation, step_reward, step_done, step_truncated, _ = self._env.step(action)
             reward += float(step_reward)
             done = step_done or step_truncated
             if done:

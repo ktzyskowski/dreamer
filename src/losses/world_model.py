@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributions.kl import kl_divergence
 
 from data.data import ObservedOutput, WorldModelInput
 from src.util.functions import symlog
+from src.util.probability import multi_categorical
 from src.util.two_hot import TwoHot
 
 
@@ -16,43 +18,31 @@ class WorldModelLoss(nn.Module):
         self.beta_prior = config.world_model_loss.beta_prior
         self.beta_prediction = config.world_model_loss.beta_prediction
         self.free_nats = config.world_model_loss.free_nats
+        self.n_categoricals = config.world_model.n_categoricals
+        self.n_classes = config.world_model.n_classes
         self.two_hot = TwoHot(low=config.two_hot.low, high=config.two_hot.high, n_bins=config.two_hot.n_bins)
         # store subcomponents of loss in dictionary to log later
         self.metrics = {}
 
-    def calculate_kl_loss(self, input, target):
-        loss = torch.nn.functional.kl_div(input, target=target, log_target=True, reduction="none")
-        # sum KL over classes, per categorical
-        loss = loss.sum(-1).sum(-1)
-
-        # free nats clamping
-        loss = torch.clamp(loss, min=self.free_nats)
-
-        # take mean over batch
-        loss = loss.mean()
-        return loss
-
     def calculate_prior_loss(self, observed_output: ObservedOutput):
-        posterior_log_probs = observed_output["posterior_log_probs"]
-        prior_log_probs = observed_output["prior_log_probs"]
-
-        # Dynamics loss in Eq (3)
-        loss = self.calculate_kl_loss(
-            prior_log_probs,
-            target=posterior_log_probs.detach(),
+        # Dynamics loss in Eq (3): KL(sg[posterior] || prior)
+        posterior = multi_categorical(
+            observed_output["posterior_logits"].detach(), self.n_categoricals, self.n_classes
         )
+        prior = multi_categorical(observed_output["prior_logits"], self.n_categoricals, self.n_classes)
+        loss = kl_divergence(posterior, prior)
+        loss = torch.clamp(loss, min=self.free_nats).mean()
         loss = self.beta_prior * loss
         return loss
 
     def calculate_posterior_loss(self, observed_output: ObservedOutput):
-        posterior_log_probs = observed_output["posterior_log_probs"]
-        prior_log_probs = observed_output["prior_log_probs"]
-
-        # Representation loss in Eq (3)
-        loss = self.calculate_kl_loss(
-            prior_log_probs.detach(),
-            target=posterior_log_probs,
+        # Representation loss in Eq (3): KL(posterior || sg[prior])
+        posterior = multi_categorical(observed_output["posterior_logits"], self.n_categoricals, self.n_classes)
+        prior = multi_categorical(
+            observed_output["prior_logits"].detach(), self.n_categoricals, self.n_classes
         )
+        loss = kl_divergence(posterior, prior)
+        loss = torch.clamp(loss, min=self.free_nats).mean()
         loss = self.beta_posterior * loss
         return loss
 

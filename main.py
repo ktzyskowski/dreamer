@@ -4,7 +4,8 @@ from dataclasses import asdict
 import torch
 
 from agent.actor import DiscreteActor
-from agent.critic import DualCritic
+from env.factory import build_env
+from rl.critic import DualCritic
 from world_model import WorldModel
 from src.training.trainer import Trainer
 from src.training.metrics import MetricsAggregator
@@ -22,7 +23,9 @@ def main(config: Config):
     if config.torch.float32_matmul_precision is not None:
         torch.set_float32_matmul_precision(config.torch.float32_matmul_precision)
 
-    with MetricsAggregator(experiment_name="dreamer") as metrics, EnvironmentManager(config) as env:
+    metrics = MetricsAggregator(experiment_name="dreamer")
+    env = build_env("vector", name="CartPole-v1", action_repeat=1)
+    with metrics, env:
         metrics.log_params(flatten(asdict(config)))
         # metrics.log_params({"world_model_parameters": count_parameters(...)})
 

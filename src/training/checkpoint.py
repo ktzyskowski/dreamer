@@ -1,5 +1,4 @@
 import os
-from typing import Any
 
 import torch
 import torch.optim as optim

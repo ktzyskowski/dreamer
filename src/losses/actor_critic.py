@@ -1,11 +1,11 @@
 from torch import Tensor, nn
 import torch
-from torch.distributions import Categorical
 import torch.nn.functional as F
 
-from agent.critic import DualCritic
+from rl.critic import DualCritic
 from data.data import DreamOutput
 from src.util.functions import calculate_lambda_returns, symexp, symlog
+from src.util.probability import policy_distribution
 from src.util.two_hot import TwoHot
 from src.util.ema import ExpMovingAverage
 
@@ -64,10 +64,9 @@ class ActorCriticLoss(nn.Module):
         dream_output: DreamOutput,
     ):
         # lambda_returns and values are both in raw reward space
-        action_probs = dream_output["action_probs"]
-        action_indices = dream_output["actions"].argmax(-1)
-        action_dist = Categorical(probs=action_probs)
-        action_log_probs = action_dist.log_prob(action_indices)
+        action_dist = policy_distribution(dream_output["action_logits"])
+        actions = dream_output["actions"]
+        action_log_probs = action_dist.log_prob(actions)
         entropy_term = action_dist.entropy()
 
         # exponentially moving average over difference between 95th and 5th percentile
@@ -82,7 +81,7 @@ class ActorCriticLoss(nn.Module):
 
         self.metrics["actor/entropy"] = entropy_term.mean().item()
         self.metrics["actor/advantage_mean"] = advantage.mean().item()
-        self.metrics["actor/max_action_prob"] = action_probs.max(dim=-1).values.mean().item()
+        self.metrics["actor/max_action_prob"] = action_dist.probs.max(dim=-1).values.mean().item()
         self.metrics["returns/mean"] = lambda_returns.mean().item()
         self.metrics["returns/p5"] = p5.item()
         self.metrics["returns/p95"] = p95.item()

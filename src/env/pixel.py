@@ -1,3 +1,7 @@
+# placeholder file:
+# old code for Atari envs, will refactor and introduce once moved on from CartPole and beginner test environments.
+
+
 # import gymnasium as gym
 # import numpy as np
 # from gymnasium.wrappers import (
