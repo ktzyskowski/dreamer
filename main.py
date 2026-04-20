@@ -5,6 +5,8 @@ import torch.nn as nn
 
 from src.data.buffer import ReplayBuffer
 from src.env.factory import build_env
+from src.losses.actor_critic import ActorCriticLoss
+from src.losses.world_model import WorldModelLoss
 from src.nets.activations import RMSNormSiLU
 from src.nets.mlp import MultiLayerPerceptron
 from src.rl.agent import Agent
@@ -42,6 +44,9 @@ def main():
     sequence_length = 32
     warmup_steps = 1_024
     replay_ratio = 4
+
+    two_hot_low = -20.0
+    two_hot_high = 20.0
 
     # Models ------------------------------------------------------------- #
     # TODO: real MLP encoder/decoder for vector envs; CNN variants for pixels
@@ -110,29 +115,44 @@ def main():
         dtype="float32",
     )
 
-    collector = Collector(
-        env=env,
-        dreamer=dreamer,
-        replay_buffer=replay_buffer,
-        device=device,
+    world_model_loss = WorldModelLoss(
+        n_categoricals=n_categoricals,
+        n_classes=n_classes,
+        two_hot_low=two_hot_low,
+        two_hot_high=two_hot_high,
+        two_hot_n_bins=n_bins,
     )
-
-    trainer = Trainer(
-        # dreamer=dreamer,
-        # collector=collector,
-        # replay_buffer=replay_buffer,
-        # metrics=metrics,
-        # batch_size=batch_size,
-        # sequence_length=sequence_length,
-        # warmup_steps=warmup_steps,
-        # replay_ratio=replay_ratio,
-        # device=device,
+    actor_critic_loss = ActorCriticLoss(
+        two_hot_low=two_hot_low,
+        two_hot_high=two_hot_high,
+        two_hot_n_bins=n_bins,
     )
 
     metrics = MetricsAggregator(experiment_name="dreamer")
+
     with metrics, env:
-        # trainer.train(n_steps=10_000_000)
-        pass
+        collector = Collector(
+            env=env,
+            dreamer=dreamer,
+            replay_buffer=replay_buffer,
+            device=device,
+        )
+
+        trainer = Trainer(
+            dreamer=dreamer,
+            collector=collector,
+            replay_buffer=replay_buffer,
+            metrics=metrics,
+            world_model_loss=world_model_loss,
+            actor_critic_loss=actor_critic_loss,
+            device=device,
+            batch_size=batch_size,
+            sequence_length=sequence_length,
+            warmup_steps=warmup_steps,
+            replay_ratio=replay_ratio,
+        )
+
+        trainer.train(n_steps=10_000_000)
 
 
 if __name__ == "__main__":

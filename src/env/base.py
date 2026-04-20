@@ -36,7 +36,7 @@ class BaseEnv(ABC):
         self._env = self._make_env()
         return self
 
-    def __exit__(self, _):
+    def __exit__(self, *_):
         if self._env:
             self._env.close()
             self._env = None
