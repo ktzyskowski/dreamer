@@ -58,7 +58,7 @@ class SymlogTwoHot(nn.Module):
         k = k.clamp(0, self.n_bins - 2)
 
         # bin weights (1.0 split between two bins: upper and lower)
-        upper_weight = torch.abs(self.bins[k] - y) / torch.abs(
+        upper_weight = torch.abs(self.bins[k] - y_symlog) / torch.abs(
             self.bins[k + 1] - self.bins[k]
         )
         lower_weight = 1.0 - upper_weight
