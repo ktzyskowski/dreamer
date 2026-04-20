@@ -27,7 +27,7 @@ def get_device(priority=None) -> str:
         # otherwise, return highest ranking available device
         selected_device = devices[-1]
         logging.info(
-            "Device '{}' not available, falling back to '{}'",
+            "Device '%s' not available, falling back to '%s'",
             priority,
             selected_device,
         )
