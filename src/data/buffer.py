@@ -33,7 +33,7 @@ class ReplayBuffer:
         # internal buffer arrays to store transitions
         self.observations = np.zeros((self.capacity, *observation_shape), dtype=dtype)
         self.actions = np.zeros((self.capacity, action_size), dtype=dtype)
-        self.rewards = np.zeros((self.capacity,), dtype=dtype)
+        self.rewards = np.zeros((self.capacity,), dtype=np.float32)
         self.dones = np.zeros((self.capacity,), dtype=bool)
 
     def __len__(self) -> int:
@@ -118,8 +118,12 @@ class ReplayBuffer:
         if len(start_index_pool) < batch_size:
             raise ValueError("Batch size could not be fulfilled.")
 
-        start_indices = np.random.choice(start_index_pool, size=batch_size, replace=False)
-        indices = (start_indices[:, np.newaxis] + np.arange(sequence_length)) % self.capacity
+        start_indices = np.random.choice(
+            start_index_pool, size=batch_size, replace=False
+        )
+        indices = (
+            start_indices[:, np.newaxis] + np.arange(sequence_length)
+        ) % self.capacity
 
         batch_observations = self.observations[indices]
         batch_actions = self.actions[indices]
@@ -133,6 +137,11 @@ class ReplayBuffer:
             "dones": batch_dones,
         }
 
-    def sample_torch(self, batch_size: int, sequence_length: int, device="cpu", dtype=torch.float32) -> dict:
+    def sample_torch(
+        self, batch_size: int, sequence_length: int, device="cpu", dtype=torch.float32
+    ) -> dict:
         batch = self.sample(batch_size, sequence_length)
-        return {k: torch.from_numpy(v).to(dtype=dtype, device=device, non_blocking=True) for k, v in batch.items()}
+        return {
+            k: torch.from_numpy(v).to(dtype=dtype, device=device, non_blocking=True)
+            for k, v in batch.items()
+        }
