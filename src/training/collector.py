@@ -3,9 +3,9 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
+from src.rl.dreamer import Dreamer
 from src.data.buffer import ReplayBuffer
 from src.env.base import BaseEnv
-from src.world_model.world_model import WorldModel, get_full_state
 from src.util.probability import policy_distribution
 
 
@@ -15,9 +15,7 @@ class Collector:
     def __init__(
         self,
         env: BaseEnv,
-        encoder: nn.Module,
-        world_model: WorldModel,
-        actor,
+        dreamer: Dreamer,
         replay_buffer: ReplayBuffer,
         device: str,
     ):
@@ -30,7 +28,7 @@ class Collector:
 
         self._observation = self.env.reset()
         self._recurrent_state = torch.zeros(self.world_model.recurrent_size, device=self.device)
-        self._episode_reward = 0.0
+        self._episode_return = 0.0
         self._episode_length = 0.0
 
     @torch.no_grad()
@@ -44,14 +42,14 @@ class Collector:
 
         next_observation, reward, done = self.env.step(action)
         self.replay_buffer.add(self._observation, action, reward, done)
-        self._episode_reward += reward
+        self._episode_return += reward
         self._episode_length += 1
 
         if done:
-            stats = {"env/episode_reward": self._episode_reward, "env/episode_length": self._episode_length}
+            stats = {"env/episode_return": self._episode_return, "env/episode_length": self._episode_length}
             self._observation = self.env.reset()
             self._recurrent_state = torch.zeros(self.world_model.recurrent_size, device=self.device)
-            self._episode_reward = 0.0
+            self._episode_return = 0.0
             self._episode_length = 0
             return stats
 

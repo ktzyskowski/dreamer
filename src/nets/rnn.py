@@ -18,9 +18,7 @@ def block_sizes(input_size: int, n_blocks: int) -> list[int]:
         list[int]: list of block sizes.
     """
     if input_size < n_blocks:
-        raise ValueError(
-            f"Cannot split given input_size {input_size} into {n_blocks} blocks."
-        )
+        raise ValueError(f"Cannot split given input_size {input_size} into {n_blocks} blocks.")
     if input_size % n_blocks == 0:
         block_size = input_size // n_blocks
         return n_blocks * [block_size]
@@ -46,12 +44,7 @@ class BlockDiagonalGRU(nn.Module):
         self.recurrent_block_sizes = block_sizes(recurrent_size, n_blocks)
         self.input_block_sizes = block_sizes(input_size, n_blocks)
         self.cells = nn.ModuleList(
-            [
-                nn.GRUCell(i_size, h_size)
-                for i_size, h_size in zip(
-                    self.input_block_sizes, self.recurrent_block_sizes
-                )
-            ]
+            [nn.GRUCell(i_size, h_size) for i_size, h_size in zip(self.input_block_sizes, self.recurrent_block_sizes)]
         )
         self.layer_norm = nn.LayerNorm(recurrent_size)
 
@@ -68,9 +61,7 @@ class BlockDiagonalGRU(nn.Module):
         x_blocks = x.chunk(self.n_blocks, dim=-1)
         h_blocks = h.chunk(self.n_blocks, dim=-1)
         # process each chunk in its respective GRU cell
-        new_h_blocks = [
-            cell(x_i, h_i) for cell, x_i, h_i in zip(self.cells, x_blocks, h_blocks)
-        ]
+        new_h_blocks = [cell(x_i, h_i) for cell, x_i, h_i in zip(self.cells, x_blocks, h_blocks)]
         # concatenate chunk outputs of each GRU cell back together
         new_h = torch.cat(new_h_blocks, dim=-1)
         return self.layer_norm(new_h)

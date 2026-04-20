@@ -1,3 +1,5 @@
+# placeholder for when I move to pixel environments and need a CNN encoder/decoder
+
 # from torch import nn
 
 

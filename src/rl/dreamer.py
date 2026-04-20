@@ -48,6 +48,29 @@ class Dreamer(nn.Module):
         nn.init.zeros_(self.reward_predictor.net[-1].weight)
         nn.init.zeros_(self.reward_predictor.net[-1].bias)
 
+    def world_model_parameters(self):
+        return (
+            list(self.encoder.parameters())
+            + list(self.decoder.parameters())
+            + list(self.world_model.parameters())
+            + list(self.reward_predictor.parameters())
+            + list(self.continue_predictor.parameters())
+        )
+
+    def freeze_world_model(self):
+        for p in self.world_model_parameters():
+            p.requires_grad_(False)
+
+    def unfreeze_world_model(self):
+        for p in self.world_model_parameters():
+            p.requires_grad_(True)
+
+    def actor_parameters(self):
+        return list(self.agent.actor.parameters())
+
+    def critic_parameters(self):
+        return list(self.agent.critic.fast.parameters())
+
     def observe(self, batch: dict) -> dict:
         """Run real transitions through the encoder, world model, and heads.
 

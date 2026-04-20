@@ -72,7 +72,7 @@ class ReplayBuffer:
         if self.buffer_index == 0:
             self.is_full = True
 
-    def sample(self, batch_size, sequence_length) -> dict:
+    def sample(self, batch_size: int, sequence_length: int) -> dict:
         """Sample a batch of sequences of transitions from the replay buffer.
 
         A single sequence may contain multiple episode trajectories if the
@@ -118,12 +118,8 @@ class ReplayBuffer:
         if len(start_index_pool) < batch_size:
             raise ValueError("Batch size could not be fulfilled.")
 
-        start_indices = np.random.choice(
-            start_index_pool, size=batch_size, replace=False
-        )
-        indices = (
-            start_indices[:, np.newaxis] + np.arange(sequence_length)
-        ) % self.capacity
+        start_indices = np.random.choice(start_index_pool, size=batch_size, replace=False)
+        indices = (start_indices[:, np.newaxis] + np.arange(sequence_length)) % self.capacity
 
         batch_observations = self.observations[indices]
         batch_actions = self.actions[indices]
@@ -136,3 +132,7 @@ class ReplayBuffer:
             "rewards": batch_rewards,
             "dones": batch_dones,
         }
+
+    def sample_torch(self, batch_size: int, sequence_length: int, device="cpu", dtype=torch.float32) -> dict:
+        batch = self.sample(batch_size, sequence_length)
+        return {k: torch.from_numpy(v).to(dtype=dtype, device=device, non_blocking=True) for k, v in batch.items()}

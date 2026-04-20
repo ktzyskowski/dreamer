@@ -1,119 +1,118 @@
-from torch import Tensor, nn
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
-from rl.critic import DualCritic
-from data.data import DreamOutput
-from src.util.functions import calculate_lambda_returns, symexp, symlog
+from src.rl.returns import calculate_lambda_returns
+from src.transforms.ema import ExpMovingAverage
+from src.transforms.twohot import SymlogTwoHot
 from src.util.probability import policy_distribution
-from src.util.two_hot import TwoHot
-from src.util.ema import ExpMovingAverage
 
 
 class ActorCriticLoss(nn.Module):
-    def __init__(self, config):
+    def __init__(
+        self,
+        two_hot_low: float,
+        two_hot_high: float,
+        two_hot_n_bins: int,
+        discount: float = 0.99,
+        trace_decay: float = 0.95,
+        entropy_coefficient: float = 5e-2,
+        slow_regularization_weight: float = 1.0,
+        advantage_norm_decay: float = 0.99,
+    ):
         super().__init__()
-        self.two_hot = TwoHot(
-            low=config.two_hot.low,
-            high=config.two_hot.high,
-            n_bins=config.two_hot.n_bins,
-        )
+        self.discount = discount
+        self.trace_decay = trace_decay
+        self.entropy_coefficient = entropy_coefficient
+        self.slow_regularization_weight = slow_regularization_weight
+        self.advantage_norm = ExpMovingAverage(decay=advantage_norm_decay)
+        self.symlog_two_hot = SymlogTwoHot(low=two_hot_low, high=two_hot_high, n_bins=two_hot_n_bins)
 
-        self.moving_average = ExpMovingAverage(decay=config.actor_critic_loss.ema_decay)
-        self.eta = config.actor_critic_loss.eta
-        self.lamda = config.actor_critic_loss.lamda
-        self.gamma = config.actor_critic_loss.gamma
-        self.slow_reg = config.actor_critic_loss.slow_reg
+    def forward(
+        self,
+        dream_output: dict,
+        fast_critic_logits: torch.Tensor,
+        slow_critic_logits: torch.Tensor,
+    ) -> tuple[torch.Tensor, dict[str, float]]:
+        slow_values = self.symlog_two_hot.decode(slow_critic_logits)
+        rewards = self.symlog_two_hot.decode(dream_output["predicted_reward_logits"])
+        continues = torch.sigmoid(dream_output["predicted_continue_logits"]).squeeze(-1)
 
-        # see world_model_loss.py
-        self.metrics = {}
-
-    def forward(self, dream_output: DreamOutput, critic: DualCritic):
-        # reset metrics accumulator
-        self.metrics = {}
-
-        # calculate lambda returns, required by both actor and critic loss functions.
-        # two-hot bins cover symlog range, so decoded values are in symlog space;
-        # lambda returns are computed in raw space, then symlog'd before encoding as targets.
-        critic_logits = critic.fast(dream_output["full_states"])
-        slow_values_symlog = self.two_hot.decode(critic.slow(dream_output["full_states"]))
-        slow_values_raw = symexp(slow_values_symlog)
-        continues = torch.distributions.Bernoulli(logits=dream_output["predicted_continue_logits"]).probs
-        rewards = symexp(self.two_hot.decode(dream_output["predicted_reward_logits"]))
         lambda_returns = calculate_lambda_returns(
             rewards=rewards,
-            continues=continues.squeeze(-1),  # remove trailing size 1 dimension
-            values=slow_values_raw,
-            gamma=self.gamma,
-            lamda=self.lamda,
+            continues=continues,
+            values=slow_values,
+            discount=self.discount,
+            trace_decay=self.trace_decay,
         )
 
-        critic_loss = self.calculate_critic_loss(lambda_returns, critic_logits, slow_values_symlog)
-        actor_loss = self.calculate_actor_loss(lambda_returns, slow_values_raw, dream_output)
-        loss = critic_loss + actor_loss
+        actor_loss, actor_metrics = self.actor_loss(lambda_returns, slow_values, dream_output)
+        critic_loss, critic_metrics = self.critic_loss(lambda_returns, fast_critic_logits, slow_values)
+        loss = actor_loss + critic_loss
 
-        self.metrics["loss/actor"] = actor_loss.item()
-        self.metrics["loss/critic"] = critic_loss.item()
+        metrics = {
+            **actor_metrics,
+            **critic_metrics,
+            "loss/actor": actor_loss.item(),
+            "loss/critic": critic_loss.item(),
+        }
+        return loss, metrics
 
-        return loss
-
-    def calculate_actor_loss(
+    def actor_loss(
         self,
-        lambda_returns: Tensor,
-        values: Tensor,
-        dream_output: DreamOutput,
-    ):
-        # lambda_returns and values are both in raw reward space
-        action_dist = policy_distribution(dream_output["action_logits"])
-        actions = dream_output["actions"]
-        action_log_probs = action_dist.log_prob(actions)
-        entropy_term = action_dist.entropy()
+        lambda_returns: torch.Tensor,
+        values: torch.Tensor,
+        dream_output: dict,
+    ) -> tuple[torch.Tensor, dict[str, float]]:
+        action_distribution = policy_distribution(dream_output["action_logits"])
+        action_log_probs = action_distribution.log_prob(dream_output["actions"])
+        entropy = action_distribution.entropy()
 
-        # exponentially moving average over difference between 95th and 5th percentile
-        p95 = torch.quantile(lambda_returns.flatten(), q=0.95)
-        p5 = torch.quantile(lambda_returns.flatten(), q=0.05)
-        norm_term = self.moving_average(p95 - p5)
+        # Normalize advantages by an EMA of the (p95 - p5) return spread.
+        percentile_high = torch.quantile(lambda_returns.flatten(), q=0.95)
+        percentile_low = torch.quantile(lambda_returns.flatten(), q=0.05)
+        advantage_normalizer = self.advantage_norm(percentile_high - percentile_low)
 
         advantage = lambda_returns - values
-        summands = (advantage / torch.clamp(norm_term, min=1)).detach()
-        summands = summands * action_log_probs
-        loss = -summands.mean() - self.eta * entropy_term.mean()
+        normalized_advantage = (advantage / torch.clamp(advantage_normalizer, min=1)).detach()
+        reinforce_term = normalized_advantage * action_log_probs
+        loss = -reinforce_term.mean() - self.entropy_coefficient * entropy.mean()
 
-        self.metrics["actor/entropy"] = entropy_term.mean().item()
-        self.metrics["actor/advantage_mean"] = advantage.mean().item()
-        self.metrics["actor/max_action_prob"] = action_dist.probs.max(dim=-1).values.mean().item()
-        self.metrics["returns/mean"] = lambda_returns.mean().item()
-        self.metrics["returns/p5"] = p5.item()
-        self.metrics["returns/p95"] = p95.item()
-        self.metrics["returns/p95-p5"] = self.metrics["returns/p95"] - self.metrics["returns/p5"]
-        self.metrics["returns/norm"] = norm_term.item()
+        metrics = {
+            "actor/entropy": entropy.mean().item(),
+            "actor/advantage_mean": advantage.mean().item(),
+            "actor/max_action_prob": action_distribution.probs.max(dim=-1).values.mean().item(),
+            "returns/mean": lambda_returns.mean().item(),
+            "returns/percentile_low": percentile_low.item(),
+            "returns/percentile_high": percentile_high.item(),
+            "returns/spread": (percentile_high - percentile_low).item(),
+            "returns/normalizer": advantage_normalizer.item(),
+        }
+        return loss, metrics
 
-        return loss
-
-    def calculate_critic_loss(
+    def critic_loss(
         self,
-        lambda_returns: Tensor,
-        critic_logits: Tensor,
-        slow_values_symlog: Tensor,
-    ):
-        # lambda_returns are in raw space; two-hot bins cover symlog range, so symlog first.
-        lambda_return_logits = self.two_hot.encode(symlog(lambda_returns.detach()))
-        # permute: (batch, sequence, classes) -> (batch, classes, sequence)
-        # because cross_entropy expects class dimension in 2nd position
+        lambda_returns: torch.Tensor,
+        fast_critic_logits: torch.Tensor,
+        slow_critic_values: torch.Tensor,
+    ) -> tuple[torch.Tensor, dict[str, float]]:
+        # SymlogTwoHot.encode applies symlog internally; pass raw values.
+        return_target = self.symlog_two_hot.encode(lambda_returns.detach())
+        slow_target = self.symlog_two_hot.encode(slow_critic_values.detach())
+
+        # cross_entropy expects class dim in position 1: (B, T, C) -> (B, C, T)
         return_loss = F.cross_entropy(
-            critic_logits.permute(0, 2, 1),
-            lambda_return_logits.permute(0, 2, 1),
+            fast_critic_logits.permute(0, 2, 1),
+            return_target.permute(0, 2, 1),
+        )
+        slow_regularization_loss = F.cross_entropy(
+            fast_critic_logits.permute(0, 2, 1),
+            slow_target.permute(0, 2, 1),
         )
 
-        # regularize fast critic toward slow critic's prediction (DreamerV3, Hafner et al.)
-        # slow_values already in symlog space (decoded from symlog-range bins)
-        slow_target_logits = self.two_hot.encode(slow_values_symlog.detach())
-        slow_reg_loss = F.cross_entropy(
-            critic_logits.permute(0, 2, 1),
-            slow_target_logits.permute(0, 2, 1),
-        )
-
-        self.metrics["critic/return_loss"] = return_loss.item()
-        self.metrics["critic/slow_reg_loss"] = slow_reg_loss.item()
-
-        return return_loss + self.slow_reg * slow_reg_loss
+        loss = return_loss + self.slow_regularization_weight * slow_regularization_loss
+        metrics = {
+            "critic/return_loss": return_loss.item(),
+            "critic/slow_regularization_loss": slow_regularization_loss.item(),
+        }
+        return loss, metrics

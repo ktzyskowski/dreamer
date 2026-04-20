@@ -44,9 +44,6 @@ def mixin_uniform(probs: torch.Tensor, split=0.01, dim=-1) -> torch.Tensor:
         probs (*): the tensor of probabilities.
         split (float): percentage assigned to uniform distribution.
         dim (int): tensor probability dimension.
-
-    Returns:
-        torch.Tensor: mixed probability distribution.
     """
     # create uniform distribution over specified dimension
     uniform = torch.ones_like(probs) / probs.shape[dim]
