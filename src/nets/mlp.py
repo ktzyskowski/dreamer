@@ -15,6 +15,7 @@ class MultiLayerPerceptron(nn.Module):
         output_activation: Optional[Type[nn.Module]] = None,
     ):
         super().__init__()
+        assert len(hidden_dims) > 0
 
         # internal MLP layers
         layers = []
