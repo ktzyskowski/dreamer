@@ -34,8 +34,8 @@ class DualCritic(nn.Module):
         )
 
         # initialize last layer to output zero, to avoid hallucinating early rewards
-        nn.init.zeros_(self.fast.net[-1].weight)
-        nn.init.zeros_(self.fast.net[-1].bias)
+        nn.init.zeros_(self.fast.net[-1].weight)  # type: ignore
+        nn.init.zeros_(self.fast.net[-1].bias)  # type: ignore
 
         # slow network is a copy of the fast network
         self.slow = copy.deepcopy(self.fast)
@@ -47,5 +47,7 @@ class DualCritic(nn.Module):
     @torch.no_grad()
     def update_slow(self):
         """Update the parameters of the slow critic network."""
-        for fast_param, slow_param in zip(self.fast.parameters(), self.slow.parameters()):
+        for fast_param, slow_param in zip(
+            self.fast.parameters(), self.slow.parameters()
+        ):
             slow_param.lerp_(fast_param, 1 - self.decay)

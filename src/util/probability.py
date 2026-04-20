@@ -1,9 +1,16 @@
 import torch
 import torch.nn.functional as F
-from torch.distributions import Distribution, Independent, OneHotCategorical, OneHotCategoricalStraightThrough
+from torch.distributions import (
+    Distribution,
+    Independent,
+    OneHotCategorical,
+    OneHotCategoricalStraightThrough,
+)
 
 
-def multi_categorical(logits: torch.Tensor, n_categoricals: int, n_classes: int) -> Distribution:
+def multi_categorical(
+    logits: torch.Tensor, n_categoricals: int, n_classes: int
+) -> Distribution:
     """Build a multi-categorical distribution from (possibly flat) logits.
 
     The returned distribution has event_shape (n_categoricals, n_classes).
@@ -18,7 +25,9 @@ def multi_categorical(logits: torch.Tensor, n_categoricals: int, n_classes: int)
     return Independent(OneHotCategoricalStraightThrough(logits=logits), 1)
 
 
-def policy_distribution(logits: torch.Tensor, uniform_mix: float = 0.01) -> Distribution:
+def policy_distribution(
+    logits: torch.Tensor, uniform_mix: float = 0.01
+) -> Distribution:
     """Build a one-hot categorical policy distribution from action logits.
 
     A small uniform mixture is blended into the probabilities to keep every action's

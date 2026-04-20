@@ -47,7 +47,7 @@ class ActorCriticLoss(nn.Module):
         )
 
         actor_loss, actor_metrics = self.actor_loss(lambda_returns, slow_values, dream_output)
-        critic_loss, critic_metrics = self.critic_loss(lambda_returns, fast_critic_logits, slow_values)
+        critic_loss, critic_metrics = self.critic_loss(lambda_returns, fast_critic_logits, slow_critic_logits)
         loss = actor_loss + critic_loss
 
         metrics = {
@@ -94,11 +94,13 @@ class ActorCriticLoss(nn.Module):
         self,
         lambda_returns: torch.Tensor,
         fast_critic_logits: torch.Tensor,
-        slow_critic_values: torch.Tensor,
+        slow_critic_logits: torch.Tensor,
     ) -> tuple[torch.Tensor, dict[str, float]]:
         # SymlogTwoHot.encode applies symlog internally; pass raw values.
         return_target = self.symlog_two_hot.encode(lambda_returns.detach())
-        slow_target = self.symlog_two_hot.encode(slow_critic_values.detach())
+        # Regularize against the slow critic's own distribution directly, with
+        # no lossy decode/re-encode through two-hot expectations.
+        slow_probs = F.softmax(slow_critic_logits.detach(), dim=-1)
 
         # cross_entropy expects class dim in position 1: (B, T, C) -> (B, C, T)
         return_loss = F.cross_entropy(
@@ -107,7 +109,7 @@ class ActorCriticLoss(nn.Module):
         )
         slow_regularization_loss = F.cross_entropy(
             fast_critic_logits.permute(0, 2, 1),
-            slow_target.permute(0, 2, 1),
+            slow_probs.permute(0, 2, 1),
         )
 
         loss = return_loss + self.slow_regularization_weight * slow_regularization_loss

@@ -30,7 +30,6 @@ class Dreamer(nn.Module):
         reward_predictor: MultiLayerPerceptron,
         continue_predictor: MultiLayerPerceptron,
         dream_horizon: int,
-        n_dreams: int = -1,
     ):
         super().__init__()
         self.encoder = encoder
@@ -41,12 +40,11 @@ class Dreamer(nn.Module):
         self.continue_predictor = continue_predictor
 
         self.dream_horizon = dream_horizon
-        self.n_dreams = n_dreams
 
         # zero-init last layer of reward predictor to avoid hallucinating
         # rewards before any training has happened
-        nn.init.zeros_(self.reward_predictor.net[-1].weight)
-        nn.init.zeros_(self.reward_predictor.net[-1].bias)
+        nn.init.zeros_(self.reward_predictor.net[-1].weight)  # type: ignore
+        nn.init.zeros_(self.reward_predictor.net[-1].bias)  # type: ignore
 
     def world_model_parameters(self):
         return (
@@ -85,7 +83,9 @@ class Dreamer(nn.Module):
             "predicted_continue_logits".
         """
         encoded_observations = self.encoder(batch["observations"])
-        output = self.world_model(encoded_observations, batch["actions"], batch["dones"])
+        output = self.world_model(
+            encoded_observations, batch["actions"], batch["dones"]
+        )
         full_states = output["full_states"]
         output["reconstructed_observations"] = self.decoder(full_states)
         output["predicted_reward_logits"] = self.reward_predictor(full_states)
@@ -93,11 +93,11 @@ class Dreamer(nn.Module):
         return output
 
     def dream(self, full_states: torch.Tensor, recurrent_states: torch.Tensor) -> dict:
-        """Generate imagined rollouts seeded from observed model states.
+        """Generate imagined rollouts seeded from every observed model state.
 
-        At each chosen start timestep, the rollout begins from the cached
-        posterior full_state. From there we step the world model forward using
-        the prior over latents and the agent's actor.
+        Each of the B*T states from the observe phase seeds its own rollout.
+        From there we step the world model forward using the prior over
+        latents and the agent's actor.
 
         Args:
             full_states (B, T, full_state_size): full states from observe.
@@ -113,13 +113,9 @@ class Dreamer(nn.Module):
             reward/continue logits cover the dreamed steps only (length
             dream_horizon).
         """
-        sequence_length = full_states.shape[1]
-        n_starts = self.n_dreams if self.n_dreams > 0 else sequence_length
-        starts = torch.randperm(sequence_length, device=full_states.device)[:n_starts]
-
-        # flatten (batch, n_starts) into one batch dim for the rollout
-        full_state = full_states[:, starts].flatten(0, 1)
-        recurrent_state = recurrent_states[:, starts].flatten(0, 1)
+        # flatten (batch, time) into one batch dim for the rollout
+        full_state = full_states.flatten(0, 1)
+        recurrent_state = recurrent_states.flatten(0, 1)
         # full_state layout is (recurrent | latent); slice the latent back out
         latent_state = full_state[..., self.world_model.recurrent_size :]
 
@@ -131,7 +127,9 @@ class Dreamer(nn.Module):
         out_actions = [action]
 
         for _ in range(self.dream_horizon):
-            recurrent_state = self.world_model.step(latent_state, recurrent_state, action)
+            recurrent_state = self.world_model.step(
+                latent_state, recurrent_state, action
+            )
             latent_state = self.world_model.get_prior_latent_state(recurrent_state)
             full_state = get_full_state(latent_state, recurrent_state)
             action_logits = self.agent.actor(full_state)
@@ -171,10 +169,14 @@ class Dreamer(nn.Module):
         encoded = self.encoder(observation).unsqueeze(0)
         recurrent_state = recurrent_state.unsqueeze(0)
 
-        latent_state = self.world_model.get_posterior_latent_state(encoded, recurrent_state)
+        latent_state = self.world_model.get_posterior_latent_state(
+            encoded, recurrent_state
+        )
         full_state = get_full_state(latent_state, recurrent_state)
         action_logits = self.agent.actor(full_state)
         action = policy_distribution(action_logits, uniform_mix=0.01).sample()
 
-        next_recurrent_state = self.world_model.step(latent_state, recurrent_state, action)
+        next_recurrent_state = self.world_model.step(
+            latent_state, recurrent_state, action
+        )
         return action.squeeze(0), next_recurrent_state.squeeze(0)
