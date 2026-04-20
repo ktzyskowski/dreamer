@@ -53,8 +53,8 @@ class ActorCriticLoss(nn.Module):
         metrics = {
             **actor_metrics,
             **critic_metrics,
-            "loss/actor": actor_loss.item(),
-            "loss/critic": critic_loss.item(),
+            "loss/actor": actor_loss,
+            "loss/critic": critic_loss,
         }
         return loss, metrics
 
@@ -79,14 +79,14 @@ class ActorCriticLoss(nn.Module):
         loss = -reinforce_term.mean() - self.entropy_coefficient * entropy.mean()
 
         metrics = {
-            "actor/entropy": entropy.mean().item(),
-            "actor/advantage_mean": advantage.mean().item(),
-            "actor/max_action_prob": action_distribution.probs.max(dim=-1).values.mean().item(),
-            "returns/mean": lambda_returns.mean().item(),
-            "returns/percentile_low": percentile_low.item(),
-            "returns/percentile_high": percentile_high.item(),
-            "returns/spread": (percentile_high - percentile_low).item(),
-            "returns/normalizer": advantage_normalizer.item(),
+            "actor/entropy": entropy.mean(),
+            "actor/advantage_mean": advantage.mean(),
+            "actor/max_action_prob": action_distribution.probs.max(dim=-1).values.mean(),
+            "returns/mean": lambda_returns.mean(),
+            "returns/percentile_low": percentile_low,
+            "returns/percentile_high": percentile_high,
+            "returns/spread": percentile_high - percentile_low,
+            "returns/normalizer": advantage_normalizer,
         }
         return loss, metrics
 
@@ -114,7 +114,7 @@ class ActorCriticLoss(nn.Module):
 
         loss = return_loss + self.slow_regularization_weight * slow_regularization_loss
         metrics = {
-            "critic/return_loss": return_loss.item(),
-            "critic/slow_regularization_loss": slow_regularization_loss.item(),
+            "critic/return_loss": return_loss,
+            "critic/slow_regularization_loss": slow_regularization_loss,
         }
         return loss, metrics

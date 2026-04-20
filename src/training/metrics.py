@@ -1,6 +1,10 @@
-from typing import Any
+from typing import Any, Union
 
 import mlflow
+import torch
+
+
+MetricValue = Union[float, int, torch.Tensor]
 
 
 class MetricsAggregator:
@@ -23,11 +27,19 @@ class MetricsAggregator:
         self.log_every_n_gradient_steps = log_every_n_gradient_steps
         self.log_system_metrics = log_system_metrics
 
-        self._pending: dict[str, float] = {}
+        self._pending: dict[str, MetricValue] = {}
 
-    def update(self, metrics: dict[str, float]):
-        """Update pending metrics, not logged until `maybe_flush` is called."""
-        self._pending.update(metrics)
+    def update(self, metrics: dict[str, MetricValue]):
+        """Update pending metrics, not logged until `maybe_flush` is called.
+
+        Tensor values are detached but left on-device; they are only
+        materialized to floats at flush time to avoid forcing a CPU sync
+        on every gradient step.
+        """
+        for key, value in metrics.items():
+            if isinstance(value, torch.Tensor):
+                value = value.detach()
+            self._pending[key] = value
 
     def maybe_flush(self, gradient_step: int):
         """Flush pending metrics, according to current gradient step and logging cadence."""
@@ -35,7 +47,11 @@ class MetricsAggregator:
             return
         if not self._pending:
             return
-        mlflow.log_metrics(self._pending, step=gradient_step)
+        resolved = {
+            key: (value.item() if isinstance(value, torch.Tensor) else value)
+            for key, value in self._pending.items()
+        }
+        mlflow.log_metrics(resolved, step=gradient_step)
         self._pending.clear()
 
     def log(self, metrics: dict[str, float], step: int):

@@ -1,12 +1,13 @@
 import torch
 
 
+@torch.jit.script
 def calculate_lambda_returns(
     rewards: torch.Tensor,
     continues: torch.Tensor,
     values: torch.Tensor,
-    discount=0.997,
-    trace_decay=0.95,
+    discount: float = 0.997,
+    trace_decay: float = 0.95,
 ):
     """Calculate lambda returns for a given sequence of observed rewards and critic values.
 
@@ -27,7 +28,7 @@ def calculate_lambda_returns(
     # the return at time T is equal to the value at time T (bootstrap value)
     returns[..., T] = values[..., T]
 
-    for t in reversed(range(T)):
+    for t in range(T - 1, -1, -1):
         bootstrap_target = (1 - trace_decay) * values[..., t] + trace_decay * returns[..., t + 1]
         returns[..., t] = rewards[..., t] + discount * continues[..., t] * bootstrap_target
 

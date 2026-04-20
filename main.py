@@ -105,6 +105,13 @@ def main():
         dream_horizon=cfg.dreamer.dream_horizon,
     ).to(device)
 
+    if device == "cuda":
+        # Compile the per-gradient-step hot paths. These contain tight
+        # Python loops over sequence_length / dream_horizon; compiling
+        # collapses the per-step MLP + GRU kernels and cuts launch overhead.
+        dreamer.observe = torch.compile(dreamer.observe, dynamic=False)
+        dreamer.dream = torch.compile(dreamer.dream, dynamic=False)
+
     # Data & training infra --------------------------------------------- #
     replay_buffer = ReplayBuffer(
         observation_shape=observation_shape,

@@ -136,12 +136,12 @@ class WorldModelLoss(nn.Module):
         world_model_loss = prior_term + posterior_term + prediction_term
 
         metrics = {
-            "world_model/prior_loss": prior_term.item(),
-            "world_model/posterior_loss": posterior_term.item(),
-            "world_model/prediction_loss": prediction_term.item(),
-            "world_model/observation_loss": observation_loss.item(),
-            "world_model/continue_loss": continue_loss.item(),
-            "world_model/reward_loss": reward_loss.item(),
-            "loss/world_model": world_model_loss.item(),
+            "world_model/prior_loss": prior_term,
+            "world_model/posterior_loss": posterior_term,
+            "world_model/prediction_loss": prediction_term,
+            "world_model/observation_loss": observation_loss,
+            "world_model/continue_loss": continue_loss,
+            "world_model/reward_loss": reward_loss,
+            "loss/world_model": world_model_loss,
         }
         return world_model_loss, metrics

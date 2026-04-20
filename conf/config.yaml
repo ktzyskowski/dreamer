@@ -84,7 +84,7 @@ training:
   batch_size: 32
   sequence_length: 32
   warmup_steps: 1_024
-  replay_ratio: 1
+  replay_ratio: 16
   grad_clip: 1000.0
   checkpoint_dir: checkpoints
   save_every_n_gradient_steps: 1_000
