@@ -21,42 +21,42 @@ replay_buffer:
 
 world_model:
   learning_rate: 0.0003
-  recurrent_size: 128
-  n_categoricals: 16
-  n_classes: 16
+  recurrent_size: 512
+  n_categoricals: 32
+  n_classes: 32
 
   encoder:
-    hidden_dims: [ 128, 128 ]
+    hidden_dims: [ 512, 512 ]
     activation: rmsnorm_silu
   decoder:
-    hidden_dims: [ 128, 128 ]
+    hidden_dims: [ 512, 512 ]
     activation: rmsnorm_silu
   posterior_net:
-    hidden_dims: [ 128, 128 ]
+    hidden_dims: [ 512, 512 ]
     activation: rmsnorm_silu
   prior_net:
-    hidden_dims: [ 128, 128 ]
+    hidden_dims: [ 512, 512 ]
     activation: rmsnorm_silu
   reward_predictor:
-    hidden_dims: [ 128, 128 ]
+    hidden_dims: [ 512, 512 ]
     activation: rmsnorm_silu
   continue_predictor:
-    hidden_dims: [ 128, 128 ]
+    hidden_dims: [ 512, 512 ]
     activation: rmsnorm_silu
   recurrent_net:
-    n_blocks: 8
+    n_blocks: 1
 
 actor:
   learning_rate: 0.0003
   net:
-    hidden_dims: [ 128, 128 ]
+    hidden_dims: [ 512, 512 ]
     activation: rmsnorm_silu
 
 critic:
   learning_rate: 0.0001
   ema_decay: 0.98
   net:
-    hidden_dims: [ 128, 128 ]
+    hidden_dims: [ 512, 512 ]
     activation: rmsnorm_silu
 
 dreamer:
@@ -84,7 +84,7 @@ training:
   batch_size: 32
   sequence_length: 32
   warmup_steps: 1_024
-  replay_ratio: 4
+  replay_ratio: 1
   grad_clip: 1000.0
   checkpoint_dir: checkpoints
   save_every_n_gradient_steps: 1_000
