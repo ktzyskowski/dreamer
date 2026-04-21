@@ -83,9 +83,7 @@ class Dreamer(nn.Module):
             "predicted_continue_logits".
         """
         encoded_observations = self.encoder(batch["observations"])
-        output = self.world_model(
-            encoded_observations, batch["actions"], batch["dones"]
-        )
+        output = self.world_model(encoded_observations, batch["actions"], batch["dones"])
         full_states = output["full_states"]
         output["reconstructed_observations"] = self.decoder(full_states)
         output["predicted_reward_logits"] = self.reward_predictor(full_states)
@@ -127,9 +125,7 @@ class Dreamer(nn.Module):
         out_actions = [action]
 
         for _ in range(self.dream_horizon):
-            recurrent_state = self.world_model.step(
-                latent_state, recurrent_state, action
-            )
+            recurrent_state = self.world_model.step(latent_state, recurrent_state, action)
             latent_state = self.world_model.get_prior_latent_state(recurrent_state)
             full_state = get_full_state(latent_state, recurrent_state)
             action_logits = self.agent.actor(full_state)
@@ -157,11 +153,12 @@ class Dreamer(nn.Module):
         }
 
     @torch.no_grad()
-    def act(self, observation: torch.Tensor, recurrent_state: torch.Tensor):
+    def act(self, observation: torch.Tensor, recurrent_state: torch.Tensor, greedy: bool = False):
         """Single env step. Inputs and outputs are unbatched.
 
         Returns:
-            action: one-hot action tensor of shape (action_size,).
+            action: one-hot action tensor of shape (action_size,), sampled
+                stochastically from the policy.
             next_recurrent_state: tensor of shape (recurrent_size,).
         """
         # GRU cells require a leading batch dim; manage it internally so the
@@ -169,14 +166,13 @@ class Dreamer(nn.Module):
         encoded = self.encoder(observation).unsqueeze(0)
         recurrent_state = recurrent_state.unsqueeze(0)
 
-        latent_state = self.world_model.get_posterior_latent_state(
-            encoded, recurrent_state
-        )
+        latent_state = self.world_model.get_posterior_latent_state(encoded, recurrent_state)
         full_state = get_full_state(latent_state, recurrent_state)
         action_logits = self.agent.actor(full_state)
-        action = policy_distribution(action_logits, uniform_mix=0.01).sample()
+        if greedy:
+            action = action_logits.argmax(dim=-1)
+        else:
+            action = policy_distribution(action_logits, uniform_mix=0.01).sample()
 
-        next_recurrent_state = self.world_model.step(
-            latent_state, recurrent_state, action
-        )
+        next_recurrent_state = self.world_model.step(latent_state, recurrent_state, action)
         return action.squeeze(0), next_recurrent_state.squeeze(0)

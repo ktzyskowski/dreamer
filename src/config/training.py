@@ -12,3 +12,5 @@ class TrainingConfig:
     checkpoint_dir: str = "checkpoints"
     save_every_n_gradient_steps: int = 1_000
     checkpoint_path: str | None = None
+    eval_every_n_gradient_steps: int = 1_000
+    n_eval_episodes: int = 5

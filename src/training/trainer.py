@@ -9,6 +9,7 @@ from src.losses.world_model import WorldModelLoss
 from src.rl.dreamer import Dreamer
 from src.training.checkpoint import CheckpointManager
 from src.training.collector import Collector
+from src.training.evaluator import Evaluator
 from src.training.metrics import MetricsAggregator
 
 
@@ -33,6 +34,8 @@ class Trainer:
         grad_clip: float = 1000.0,
         checkpoint_dir: str = "checkpoints",
         save_every_n_gradient_steps: int = 1_000,
+        evaluator: Evaluator | None = None,
+        eval_every_n_gradient_steps: int = 1_000,
     ):
         self.device = device
         self.dreamer = dreamer
@@ -48,23 +51,15 @@ class Trainer:
         self.warmup_steps = warmup_steps
         self.grad_clip = grad_clip
 
-        # replay_ratio = timesteps_trained / env_timesteps (pre-action-repeat)
-        self.env_steps_per_gradient_step = max(
-            1, (batch_size * sequence_length * action_repeat) // replay_ratio
-        )
-        logging.info(
-            "Env steps per gradient step: %d", self.env_steps_per_gradient_step
-        )
+        self.evaluator = evaluator
+        self.eval_every_n_gradient_steps = eval_every_n_gradient_steps
+        self.replay_ratio = replay_ratio
 
         # Optimizers -------------------------------------------------------- #
 
-        self.world_model_optimizer = torch.optim.Adam(
-            dreamer.world_model_parameters(), lr=world_model_lr
-        )
+        self.world_model_optimizer = torch.optim.Adam(dreamer.world_model_parameters(), lr=world_model_lr)
         self.actor_optimizer = torch.optim.Adam(dreamer.actor_parameters(), lr=actor_lr)
-        self.critic_optimizer = torch.optim.Adam(
-            dreamer.critic_parameters(), lr=critic_lr
-        )
+        self.critic_optimizer = torch.optim.Adam(dreamer.critic_parameters(), lr=critic_lr)
 
         # Checkpointing ----------------------------------------------------- #
 
@@ -87,26 +82,23 @@ class Trainer:
                 # episode is terminated, log episode return and length
                 self.metrics.log(episode_stats, step=step)
 
-            ready = (
-                step >= self.warmup_steps
-                and step % self.env_steps_per_gradient_step == 0
-            )
-            if ready:
-                self.gradient_step(gradient_step)
-                self.checkpointer.maybe_save(step=step, gradient_step=gradient_step)
-                gradient_step += 1
+            if step >= self.warmup_steps:
+                for _ in range(self.replay_ratio):
+                    gradient_step += 1
+                    self.gradient_step(gradient_step)
+
+                    self.checkpointer.maybe_save(step=step, gradient_step=gradient_step)
+                    if self.evaluator is not None and gradient_step % self.eval_every_n_gradient_steps == 0:
+                        eval_stats = self.evaluator.run()
+                        self.metrics.log(eval_stats, step=gradient_step)
 
     def gradient_step(self, step: int):
-        batch = self.replay_buffer.sample_torch(
-            self.batch_size, self.sequence_length, self.device
-        )
+        batch = self.replay_buffer.sample_torch(self.batch_size, self.sequence_length, self.device)
 
         # World Model -------------------------------------------------- #
         self.world_model_optimizer.zero_grad()
         observed_output = self.dreamer.observe(batch)
-        world_model_loss, world_model_metrics = self.world_model_loss(
-            batch, observed_output
-        )
+        world_model_loss, world_model_metrics = self.world_model_loss(batch, observed_output)
         world_model_loss.backward()
         nn.utils.clip_grad_norm_(self.dreamer.world_model_parameters(), self.grad_clip)
         self.world_model_optimizer.step()

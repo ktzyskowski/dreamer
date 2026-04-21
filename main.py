@@ -13,6 +13,7 @@ from src.rl.agent import Agent
 from src.rl.dreamer import Dreamer
 from src.rl.world_model import WorldModel
 from src.training.collector import Collector
+from src.training.evaluator import Evaluator
 from src.training.metrics import MetricsAggregator
 from src.training.trainer import Trainer
 
@@ -32,6 +33,11 @@ def main():
 
     # Env ---------------------------------------------------------------- #
     env = build_env(
+        cfg.environment.type,
+        name=cfg.environment.name,
+        action_repeat=cfg.environment.action_repeat,
+    )
+    eval_env = build_env(
         cfg.environment.type,
         name=cfg.environment.name,
         action_repeat=cfg.environment.action_repeat,
@@ -146,15 +152,21 @@ def main():
 
     metrics = MetricsAggregator(experiment_name="dreamer")
 
-    with metrics, env:
+    tr_cfg = cfg.training
+    with metrics, env, eval_env:
         collector = Collector(
             env=env,
             dreamer=dreamer,
             replay_buffer=replay_buffer,
             device=device,
         )
+        evaluator = Evaluator(
+            env=eval_env,
+            dreamer=dreamer,
+            device=device,
+            n_episodes=tr_cfg.n_eval_episodes,
+        )
 
-        tr_cfg = cfg.training
         trainer = Trainer(
             dreamer=dreamer,
             collector=collector,
@@ -174,6 +186,8 @@ def main():
             grad_clip=tr_cfg.grad_clip,
             checkpoint_dir=tr_cfg.checkpoint_dir,
             save_every_n_gradient_steps=tr_cfg.save_every_n_gradient_steps,
+            evaluator=evaluator,
+            eval_every_n_gradient_steps=tr_cfg.eval_every_n_gradient_steps,
         )
 
         trainer.train(n_steps=tr_cfg.n_steps)
