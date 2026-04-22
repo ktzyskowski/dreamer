@@ -29,7 +29,7 @@ def calculate_lambda_returns(
     returns[..., T] = values[..., T]
 
     for t in range(T - 1, -1, -1):
-        bootstrap_target = (1 - trace_decay) * values[..., t] + trace_decay * returns[..., t + 1]
+        bootstrap_target = (1 - trace_decay) * values[..., t + 1] + trace_decay * returns[..., t + 1]
         returns[..., t] = rewards[..., t] + discount * continues[..., t] * bootstrap_target
 
     return returns

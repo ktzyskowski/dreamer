@@ -73,16 +73,18 @@ world_model_loss:
 actor_critic_loss:
   discount: 0.99 # reward discount factor
   trace_decay: 0.95 # lambda-returns trace decay
-  entropy_coefficient: 0.3 # actor entropy regularization
+  entropy_coefficient: 0.0003 # actor entropy regularization
   slow_regularization_weight: 1.0 # regularizer pull toward slow critic
   advantage_norm_decay: 0.99 # EMA decay for advantage normalizer
+  beta_critic_dream: 1.0 # weight for imagined-state critic loss
+  beta_critic_real: 0.3 # weight for real-state critic loss (grounded by dream λ-return)
 
 # Training ======================================================== #
 
 training:
   n_steps: 10_000_000
   batch_size: 32
-  sequence_length: 32
+  sequence_length: 64
   warmup_steps: 5_000
   replay_ratio: 2
   grad_clip: 1000.0

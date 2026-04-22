@@ -112,6 +112,7 @@ class Dreamer(nn.Module):
             dream_horizon).
         """
         # flatten (batch, time) into one batch dim for the rollout
+        B, T = full_states.shape[:2]
         full_state = full_states.flatten(0, 1)
         recurrent_state = recurrent_states.flatten(0, 1)
         # full_state layout is (recurrent | latent); slice the latent back out
@@ -135,14 +136,14 @@ class Dreamer(nn.Module):
             out_action_logits.append(action_logits)
             out_actions.append(action)
 
-        full_states = torch.stack(out_full_states, dim=1)
-        action_logits = torch.stack(out_action_logits, dim=1)
-        actions = torch.stack(out_actions, dim=1)
+        full_states = torch.stack(out_full_states, dim=1).unflatten(0, (B, T))
+        action_logits = torch.stack(out_action_logits, dim=1).unflatten(0, (B, T))
+        actions = torch.stack(out_actions, dim=1).unflatten(0, (B, T))
 
         # heads are evaluated on the dreamed steps only; the seed step at
         # index 0 came from real data and is not used as a target
-        predicted_reward_logits = self.reward_predictor(full_states[:, 1:])
-        predicted_continue_logits = self.continue_predictor(full_states[:, 1:])
+        predicted_reward_logits = self.reward_predictor(full_states[:, :, 1:])
+        predicted_continue_logits = self.continue_predictor(full_states[:, :, 1:])
 
         return {
             "full_states": full_states,

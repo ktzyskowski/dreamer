@@ -121,7 +121,11 @@ class Trainer:
         fast_critic_logits = critic.fast(full_states)
         slow_critic_logits = critic.slow(full_states)
         actor_critic_loss, actor_critic_metrics = self.actor_critic_loss(
-            dream_output, fast_critic_logits, slow_critic_logits
+            dream_output,
+            fast_critic_logits,
+            slow_critic_logits,
+            real_rewards=batch["rewards"],
+            real_continues=1.0 - batch["dones"],
         )
         actor_critic_loss.backward()
         nn.utils.clip_grad_norm_(self.dreamer.actor_parameters(), self.grad_clip)

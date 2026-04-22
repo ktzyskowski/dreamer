@@ -74,13 +74,13 @@ class WorldModel(nn.Module):
     def get_posterior_latent_state(self, encoded_observation: torch.Tensor, recurrent_state: torch.Tensor):
         logits = self.posterior_net(torch.cat([recurrent_state, encoded_observation], dim=-1))
         posterior = multi_categorical(logits, self.n_categoricals, self.n_classes)
-        latent_state = posterior.sample().flatten(-2)
+        latent_state = posterior.rsample().flatten(-2)
         return latent_state
 
     def get_prior_latent_state(self, recurrent_state: torch.Tensor):
         logits = self.prior_net(recurrent_state)
         prior = multi_categorical(logits, self.n_categoricals, self.n_classes)
-        latent_state = prior.sample().flatten(-2)
+        latent_state = prior.rsample().flatten(-2)
         return latent_state
 
     def step(self, latent_state: torch.Tensor, recurrent_state: torch.Tensor, action: torch.Tensor):
@@ -121,7 +121,7 @@ class WorldModel(nn.Module):
         for t in range(sequence_length):
             posterior_logits = self.posterior_net(torch.cat([recurrent_state, encoded_observations[:, t]], dim=-1))
             posterior = multi_categorical(posterior_logits, self.n_categoricals, self.n_classes)
-            latent_state = posterior.sample().flatten(-2)
+            latent_state = posterior.rsample().flatten(-2)
             full_state = get_full_state(latent_state, recurrent_state)
             next_recurrent_state = self.step(latent_state, recurrent_state, actions[:, t])
 
