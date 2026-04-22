@@ -34,12 +34,19 @@ class SymlogTwoHot(nn.Module):
     """Symlog two-hot transform module."""
 
     def __init__(self, low: float, high: float, n_bins: int):
+        """Construct new symlog two-hot transform.
+
+        Args:
+            low (float): lower bound of bins in symlog space.
+            high (float): upper bound of bins in symlog space.
+            n_bins (int): number of bins.
+        """
         super().__init__()
         self.low = low
         self.high = high
         self.n_bins = n_bins
 
-        self.bins: torch.Tensor
+        self.bins: torch.Tensor  # for type hinting
         self.register_buffer("bins", torch.linspace(self.low, self.high, self.n_bins))
 
     def encode(self, y):
@@ -58,9 +65,7 @@ class SymlogTwoHot(nn.Module):
         k = k.clamp(0, self.n_bins - 2)
 
         # bin weights (1.0 split between two bins: upper and lower)
-        upper_weight = torch.abs(self.bins[k] - y_symlog) / torch.abs(
-            self.bins[k + 1] - self.bins[k]
-        )
+        upper_weight = torch.abs(self.bins[k] - y_symlog) / torch.abs(self.bins[k + 1] - self.bins[k])
         lower_weight = 1.0 - upper_weight
 
         # scatter weights into new tensor with added bin dimension: (*, bins)

@@ -11,6 +11,11 @@ def get_device(priority=None) -> str:
     follow the given ranking (highest priority to leftmost device):
 
     `[priority]` >> `cuda` >> `mps` >> `cpu`
+
+    Args:
+        priority (str): optional manual device preference.
+    Returns:
+        str: selected device.
     """
 
     # get all available devices
@@ -36,6 +41,12 @@ def get_device(priority=None) -> str:
 
 
 def count_parameters(model: nn.Module) -> int:
-    """Count the number of trainable parameters in a given model."""
+    """Count the number of trainable parameters in a given model.
+
+    Args:
+        model (Module): torch module.
+    Returns:
+        int: number of trainable parameters.
+    """
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return n_parameters
