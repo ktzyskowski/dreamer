@@ -1,0 +1,92 @@
+torch:
+  device: cuda
+  # comment this out if unavailable on your machine
+  float32_matmul_precision: high
+
+environment:
+  type: vector # "vector" or "pixel"
+  name: CartPole-v1
+  action_repeat: 1
+
+two_hot:
+  low: -20
+  high: 20.0
+  n_bins: 255
+
+replay_buffer:
+  capacity: 1_000_000
+  dtype: float32
+
+# Models ========================================================== #
+
+world_model:
+  learning_rate: 0.0003
+  recurrent_size: 128
+  n_categoricals: 16
+  n_classes: 16
+
+  encoder:
+    hidden_dims: [ 128, 128 ]
+    activation: rmsnorm_silu
+  decoder:
+    hidden_dims: [ 128, 128 ]
+    activation: rmsnorm_silu
+  posterior_net:
+    hidden_dims: [ 128, 128 ]
+    activation: rmsnorm_silu
+  prior_net:
+    hidden_dims: [ 128, 128 ]
+    activation: rmsnorm_silu
+  reward_predictor:
+    hidden_dims: [ 128, 128 ]
+    activation: rmsnorm_silu
+  continue_predictor:
+    hidden_dims: [ 128, 128 ]
+    activation: rmsnorm_silu
+  recurrent_net:
+    n_blocks: 1
+
+actor:
+  learning_rate: 0.0003
+  net:
+    hidden_dims: [ 128, 128 ]
+    activation: rmsnorm_silu
+
+critic:
+  learning_rate: 0.0001
+  ema_decay: 0.98
+  net:
+    hidden_dims: [ 128, 128 ]
+    activation: rmsnorm_silu
+
+dreamer:
+  dream_horizon: 30
+
+# Loss Functions ================================================== #
+
+world_model_loss:
+  beta_posterior: 0.1
+  beta_prior: 1.0
+  beta_prediction: 1.0
+  free_nats: 1.0
+
+actor_critic_loss:
+  discount: 0.99 # reward discount factor
+  trace_decay: 0.95 # lambda-returns trace decay
+  entropy_coefficient: 0.0003 # actor entropy regularization
+  slow_regularization_weight: 1.0 # regularizer pull toward slow critic
+  advantage_norm_decay: 0.99 # EMA decay for advantage normalizer
+  beta_critic_dream: 1.0 # weight for imagined-state critic loss
+  beta_critic_real: 0.3 # weight for real-state critic loss (grounded by dream λ-return)
+
+# Training ======================================================== #
+
+training:
+  n_steps: 30_000
+  batch_size: 32
+  sequence_length: 64
+  warmup_steps: 5_000
+  replay_ratio: 2
+  grad_clip: 1000.0
+  checkpoint_dir: checkpoints
+  save_every_n_gradient_steps: 2_500
