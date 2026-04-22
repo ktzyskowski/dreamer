@@ -1,180 +1,195 @@
-# placeholder for when I move to pixel environments and need a CNN encoder/decoder
+import logging
+from typing import Type
 
-# from torch import nn
-
-
-# def conv2d_output_size(input_size: int, kernel_size: int, stride: int, padding: int):
-#     output_size = (input_size + 2 * padding - kernel_size) // stride + 1
-#     if output_size <= 0:
-#         raise ValueError("Invalid CNN configuration.")
-#     return output_size
+import torch
+import torch.nn as nn
 
 
-# # Encoder
-# # Combines with posterior model to produce latent embedding z_t ~ p(z_t | h_t, f(x_t))
-# # e_t = f(x_t)
-# class ConvNet2D(nn.Module):
-#     def __init__(
-#         self,
-#         observation_shape: tuple,
-#         output_size: int,
-#         kernel_size: int,
-#         stride: int,
-#         padding: int,
-#         activation=nn.ReLU,
-#     ):
-#         super().__init__()
-#         self.observation_shape = observation_shape
-#         self.output_size = output_size
-#         self.kernel_size = kernel_size
-#         self.stride = stride
-#         self.padding = padding
-
-#         n_channels, h, w = observation_shape
-#         # we need to calculate final (h, w) of images after all conv layers to calculate linear features
-#         for _ in range(4):
-#             h = conv2d_output_size(h, kernel_size, stride, padding)
-#             w = conv2d_output_size(w, kernel_size, stride, padding)
-
-#         self.cnn = nn.Sequential(
-#             nn.Conv2d(
-#                 n_channels,
-#                 32,
-#                 kernel_size=self.kernel_size,
-#                 stride=self.stride,
-#                 padding=self.padding,
-#             ),
-#             activation(),
-#             nn.Conv2d(
-#                 32,
-#                 64,
-#                 kernel_size=self.kernel_size,
-#                 stride=self.stride,
-#                 padding=self.padding,
-#             ),
-#             activation(),
-#             nn.Conv2d(
-#                 64,
-#                 128,
-#                 kernel_size=self.kernel_size,
-#                 stride=self.stride,
-#                 padding=self.padding,
-#             ),
-#             activation(),
-#             nn.Conv2d(
-#                 128,
-#                 256,
-#                 kernel_size=self.kernel_size,
-#                 stride=self.stride,
-#                 padding=self.padding,
-#             ),
-#             activation(),
-#             nn.Flatten(),
-#             nn.Linear(256 * h * w, output_size),
-#         )
-
-#     def forward(self, observation):
-#         input_shape = observation.shape
-#         # flatten all leading dims into a single batch dim for CNN processing
-#         observation = observation.view(-1, *self.observation_shape[-3:])
-#         encoding = self.cnn(observation)
-#         # restore original leading dims, replacing (C, H, W) with (output_size,)
-#         return encoding.view(*input_shape[:-3], self.output_size)
-
-# old decoder.py
-
-# from torch import nn
-
-# from .cnn import conv2d_output_size
-
-# # TODO: output_padding is hardcoded to 1 on the last ConvTranspose2d layer to recover the pixel
-# # lost by floor division in the encoder (e.g. 64→31 via Conv2d can't be recovered by 31→64
-# # via ConvTranspose2d without output_padding=1). This fix only works for the current config
-# # (obs=64x64, kernel=3, stride=2, padding=0). The correct fix is to compute output_padding
-# # dynamically for each layer in __init__ based on the actual encoder sizes at each step:
-# #   natural_output(h_in) = (h_in - 1) * stride - 2 * padding + kernel_size
-# #   output_padding[i] = encoder_sizes[-(i+2)] - natural_output(encoder_sizes[-(i+1)])
+def conv2d_output_size(input_size: int, kernel_size: int, stride: int, padding: int) -> int:
+    output_size = (input_size + 2 * padding - kernel_size) // stride + 1
+    if output_size <= 0:
+        raise ValueError("Invalid CNN configuration.")
+    return output_size
 
 
-# # Decoder
-# # x_t ~ p(x_t | h_t, z_t)
-# class Decoder(nn.Module):
-#     def __init__(
-#         self,
-#         observation_shape: tuple,
-#         input_dim: int,
-#         kernel_size: int,
-#         stride: int,
-#         padding: int,
-#         activation=nn.ReLU,
-#     ):
-#         super().__init__()
-#         self.observation_shape = observation_shape
-#         self.input_dim = input_dim
-#         self.kernel_size = kernel_size
-#         self.stride = stride
-#         self.padding = padding
+def conv_transpose2d_output_padding(in_size: int, target_size: int, kernel_size: int, stride: int, padding: int) -> int:
+    return target_size - ((in_size - 1) * stride - 2 * padding + kernel_size)
 
-#         n_channels, h, w = observation_shape
-#         sizes = [h]
-#         # mirror the encoder: compute the spatial size after 4 strided convolutions
-#         for _ in range(4):
-#             h = conv2d_output_size(h, kernel_size, stride, padding)
-#             w = conv2d_output_size(w, kernel_size, stride, padding)
-#             sizes.append(h)
 
-#         self.net = nn.Sequential(
-#             nn.Linear(input_dim, 256 * h * w),
-#             nn.Unflatten(1, (256, h, w)),
-#             nn.ConvTranspose2d(
-#                 256,
-#                 128,
-#                 kernel_size=kernel_size,
-#                 stride=stride,
-#                 padding=padding,
-#             ),
-#             activation(),
-#             nn.ConvTranspose2d(
-#                 128,
-#                 64,
-#                 kernel_size=kernel_size,
-#                 stride=stride,
-#                 padding=padding,
-#             ),
-#             activation(),
-#             nn.ConvTranspose2d(
-#                 64,
-#                 32,
-#                 kernel_size=kernel_size,
-#                 stride=stride,
-#                 padding=padding,
-#             ),
-#             activation(),
-#             nn.ConvTranspose2d(
-#                 32,
-#                 n_channels,
-#                 kernel_size=kernel_size,
-#                 stride=stride,
-#                 padding=padding,
-#                 output_padding=1,  # fix padding issues
-#             ),
-#             nn.Sigmoid(),
-#         )
+def compute_output_paddings(
+    input_shape: tuple[int, int, int],
+    kernel_size: int,
+    stride: int,
+    padding: int,
+    channels: list[int],
+) -> list[tuple[int, int]]:
+    """Compute per-layer output_padding values for ConvTranspose2d layers.
 
-#     def forward(self, latent):
-#         """Decode a latent vector into an image observation.
+    Args:
+        input_shape: (n_channels, height, width) of the input image.
+        kernel_size: Convolution kernel size (shared across all layers).
+        stride: Convolution stride (shared across all layers).
+        padding: Convolution padding (shared across all layers).
+        channels: List of internal channel counts (not including input n_channels).
 
-#         Args:
-#             - latent: (batch, sequence, input_dim) tensor of latent vectors.
+    Returns:
+        Per-layer (op_h, op_w) for each ConvTranspose2d, ordered from outermost
+        to innermost (same order as decoder layers).
+    """
+    _, height, width = input_shape
 
-#         Returns:
-#             - observation: (batch, sequence, channel, height, width) tensor of reconstructed observations.
-#         """
-#         # flatten any preceding dims: (..., input_dim)
-#         latent_shape = latent.shape
-#         latent = latent.view(-1, self.input_dim)
-#         # reconstruct observation: (..., channel, height, width)
-#         observation = self.net(latent)
-#         # un-flatten preceding dimensions: (..., channel, height, width)
-#         observation = observation.view(*latent_shape[:-1], *self.observation_shape)
-#         return observation
+    heights = [height]
+    widths = [width]
+    h, w = height, width
+    for _ in range(len(channels)):
+        h = conv2d_output_size(h, kernel_size, stride, padding)
+        w = conv2d_output_size(w, kernel_size, stride, padding)
+        heights.append(h)
+        widths.append(w)
+
+    output_paddings = []
+    for i in range(len(channels)):
+        op_h = conv_transpose2d_output_padding(heights[-(i + 1)], heights[-(i + 2)], kernel_size, stride, padding)
+        op_w = conv_transpose2d_output_padding(widths[-(i + 1)], widths[-(i + 2)], kernel_size, stride, padding)
+        output_paddings.append((op_h, op_w))
+
+    return output_paddings
+
+
+def check_codec_compatibility(
+    output_paddings: list[tuple[int, int]],
+    stride: int,
+) -> bool:
+    """Check whether computed output_paddings are valid for nn.ConvTranspose2d.
+
+    A configuration is compatible if every output_padding is in [0, stride),
+    which is the constraint imposed by nn.ConvTranspose2d.
+
+    Args:
+        output_paddings: Per-layer (op_h, op_w) as returned by compute_output_paddings.
+        stride: Convolution stride (shared across all layers).
+
+    Returns:
+        True if all output_padding values satisfy 0 <= op < stride.
+    """
+    return all(0 <= op_h < stride and 0 <= op_w < stride for op_h, op_w in output_paddings)
+
+
+class ConvNet2D(nn.Module):
+    """2D Convolutional Neural Net.
+
+    Used as encoder inside DreamerV3 when trained on environments with image observations.
+    """
+
+    def __init__(
+        self,
+        input_shape: tuple[int, int, int],
+        output_size: int,
+        kernel_size: int,
+        stride: int,
+        padding: int,
+        channels: list[int],
+        activation: Type[nn.Module],
+    ):
+        super().__init__()
+        self.n_channels = input_shape[0]
+        self.height = input_shape[1]
+        self.width = input_shape[2]
+        self.output_size = output_size
+
+        if self.n_channels not in {1, 3}:
+            logging.warning("n_channels is %d, double check input_shape given to CNN", self.n_channels)
+
+        # prepend input channels so zip(channels, channels[1:]) produces all conv layer pairs
+        channels = [self.n_channels] + list(channels)
+
+        layers = []
+        for in_channels, out_channels in zip(channels, channels[1:]):
+            layers.append(nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding))
+            layers.append(activation())
+
+        final_height, final_width = self.height, self.width
+        for _ in range(len(channels) - 1):
+            final_height = conv2d_output_size(final_height, kernel_size, stride, padding)
+            final_width = conv2d_output_size(final_width, kernel_size, stride, padding)
+        layers.append(nn.Flatten())
+        layers.append(nn.Linear(channels[-1] * final_height * final_width, output_size))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through CNN.
+
+        Internally, all leading dimensions are flattened into a single batch dimension,
+        then restored after processing through CNN.
+
+        Args:
+            x (*, channel, height, width): image tensors, with any leading dimensions.
+        """
+        x_flattened = x.flatten(end_dim=-4)
+        encoding = self.net(x_flattened)
+        encoding = encoding.unflatten(0, x.shape[:-3])
+        return encoding
+
+
+class ConvTransposeNet2D(nn.Module):
+    """2D Transpose Convolutional Neural Net.
+
+    Used as decoder inside DreamerV3 when trained on environments with image observations.
+    The constructor arguments are same as the ConvNet2D to keep them compatible with each other.
+    """
+
+    def __init__(
+        self,
+        input_shape: tuple[int, int, int],
+        output_size: int,
+        kernel_size: int,
+        stride: int,
+        padding: int,
+        channels: list[int],
+        activation: Type[nn.Module],
+    ):
+        super().__init__()
+        self.n_channels = input_shape[0]
+        self.height = input_shape[1]
+        self.width = input_shape[2]
+        self.output_size = output_size
+
+        if self.n_channels not in {1, 3}:
+            logging.warning("n_channels is %d, double check input_shape given to CNN", self.n_channels)
+
+        output_paddings = compute_output_paddings(input_shape, kernel_size, stride, padding, channels)
+
+        h, w = self.height, self.width
+        for _ in range(len(channels)):
+            h = conv2d_output_size(h, kernel_size, stride, padding)
+            w = conv2d_output_size(w, kernel_size, stride, padding)
+        final_height, final_width = h, w
+
+        # decoder channels: reversed internal channels, with n_channels as final output
+        dec_channels = list(reversed(channels)) + [self.n_channels]
+
+        layers: list[nn.Module] = []
+        layers.append(nn.Linear(output_size, dec_channels[0] * final_height * final_width))
+        layers.append(nn.Unflatten(1, (dec_channels[0], final_height, final_width)))
+        layers.append(activation())
+        for i, (in_ch, out_ch) in enumerate(zip(dec_channels, dec_channels[1:])):
+            layers.append(
+                nn.ConvTranspose2d(in_ch, out_ch, kernel_size, stride, padding, output_padding=output_paddings[i])
+            )
+            if i < len(dec_channels) - 2:
+                layers.append(activation())
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through transpose CNN.
+
+        Internally, all leading dimensions are flattened into a single batch dimension,
+        then restored after processing through CNN.
+
+        Args:
+            x (*, output_size): encoded feature vectors, with any leading dimensions.
+        """
+        x_flattened = x.flatten(end_dim=-2)
+        decoding = self.net(x_flattened)
+        decoding = decoding.unflatten(0, x.shape[:-1])
+        return decoding
