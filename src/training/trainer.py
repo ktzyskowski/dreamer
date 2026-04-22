@@ -27,7 +27,6 @@ class Trainer:
         sequence_length: int = 32,
         warmup_steps: int = 1_024,
         replay_ratio: int = 4,
-        action_repeat: int = 1,
         world_model_lr: float = 3e-4,
         actor_lr: float = 3e-4,
         critic_lr: float = 1e-4,
@@ -116,7 +115,7 @@ class Trainer:
         )
         self.dreamer.unfreeze_world_model()
 
-        critic = self.dreamer.agent.critic
+        critic = self.dreamer.critic
         full_states = dream_output["full_states"]
         fast_critic_logits = critic.fast(full_states)
         slow_critic_logits = critic.slow(full_states)
@@ -132,7 +131,7 @@ class Trainer:
         nn.utils.clip_grad_norm_(self.dreamer.critic_parameters(), self.grad_clip)
         self.actor_optimizer.step()
         self.critic_optimizer.step()
-        self.dreamer.agent.critic.update_slow()
+        self.dreamer.critic.update_slow()
 
         # Bookkeeping -------------------------------------------------- #
         self.metrics.update({**world_model_metrics, **actor_critic_metrics})

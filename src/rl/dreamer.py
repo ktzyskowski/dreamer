@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from src.nets.mlp import MultiLayerPerceptron
-from src.rl.agent import Agent
+from src.rl.critic import DualCritic
 from src.rl.world_model import WorldModel, get_full_state
 from src.util.probability import policy_distribution
 
@@ -26,7 +26,8 @@ class Dreamer(nn.Module):
         encoder: nn.Module,
         decoder: nn.Module,
         world_model: WorldModel,
-        agent: Agent,
+        actor: nn.Module,
+        critic: DualCritic,
         reward_predictor: MultiLayerPerceptron,
         continue_predictor: MultiLayerPerceptron,
         dream_horizon: int,
@@ -35,7 +36,8 @@ class Dreamer(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
         self.world_model = world_model
-        self.agent = agent
+        self.actor = actor
+        self.critic = critic
         self.reward_predictor = reward_predictor
         self.continue_predictor = continue_predictor
 
@@ -64,10 +66,10 @@ class Dreamer(nn.Module):
             p.requires_grad_(True)
 
     def actor_parameters(self):
-        return list(self.agent.actor.parameters())
+        return list(self.actor.parameters())
 
     def critic_parameters(self):
-        return list(self.agent.critic.fast.parameters())
+        return list(self.critic.fast.parameters())
 
     def observe(self, batch: dict) -> dict:
         """Run real transitions through the encoder, world model, and heads.
@@ -118,7 +120,7 @@ class Dreamer(nn.Module):
         # full_state layout is (recurrent | latent); slice the latent back out
         latent_state = full_state[..., self.world_model.recurrent_size :]
 
-        action_logits = self.agent.actor(full_state)
+        action_logits = self.actor(full_state)
         action = policy_distribution(action_logits).sample()
 
         out_full_states = [full_state]
@@ -129,7 +131,7 @@ class Dreamer(nn.Module):
             recurrent_state = self.world_model.step(latent_state, recurrent_state, action)
             latent_state = self.world_model.get_prior_latent_state(recurrent_state)
             full_state = get_full_state(latent_state, recurrent_state)
-            action_logits = self.agent.actor(full_state)
+            action_logits = self.actor(full_state)
             action = policy_distribution(action_logits).sample()
 
             out_full_states.append(full_state)
@@ -169,7 +171,7 @@ class Dreamer(nn.Module):
 
         latent_state = self.world_model.get_posterior_latent_state(encoded, recurrent_state)
         full_state = get_full_state(latent_state, recurrent_state)
-        action_logits = self.agent.actor(full_state)
+        action_logits = self.actor(full_state)
         if greedy:
             idx = action_logits.argmax(dim=-1)
             action = torch.nn.functional.one_hot(idx, num_classes=action_logits.shape[-1]).float()
