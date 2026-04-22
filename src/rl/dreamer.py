@@ -171,7 +171,8 @@ class Dreamer(nn.Module):
         full_state = get_full_state(latent_state, recurrent_state)
         action_logits = self.agent.actor(full_state)
         if greedy:
-            action = action_logits.argmax(dim=-1)
+            idx = action_logits.argmax(dim=-1)
+            action = torch.nn.functional.one_hot(idx, num_classes=action_logits.shape[-1]).float()
         else:
             action = policy_distribution(action_logits, uniform_mix=0.01).sample()
 
