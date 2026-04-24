@@ -23,6 +23,7 @@ from src.config.world_model import RecurrentConfig, WorldModelConfig
 
 @dataclass
 class Config:
+    experiment_name: str = "dreamer"
     torch: TorchConfig = field(default_factory=TorchConfig)
     environment: EnvironmentConfig = field(default_factory=EnvironmentConfig)
     two_hot: TwoHotConfig = field(default_factory=TwoHotConfig)
