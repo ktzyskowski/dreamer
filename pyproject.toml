@@ -8,6 +8,7 @@ dependencies = [
     "ale-py>=0.11.2",
     "array-api-compat>=1.14.0",
     "gymnasium[box2d,other]>=1.2.3",
+    "minigrid>=3.0.0",
     "mlflow>=3.10.1",
     "numpy>=2.4.2",
     "nvidia-ml-py>=13.595.45",

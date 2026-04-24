@@ -5,10 +5,7 @@ from src.env.base import BaseEnv
 
 
 class VectorEnv(BaseEnv):
-    def __init__(self, name: str, action_repeat: int = 1):
-        super().__init__(name, action_repeat)
-
     def _make_env(self) -> gym.Env:
-        env = gym.make(self.name)
+        env = gym.make(self.name, **self.extra_kwargs)
         env = NumpyToTorch(env)
         return env

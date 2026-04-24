@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Record a side-by-side comparison of a solved DreamerV3 CartPole agent vs. random."""
 
+# currently broken, after I refactored main code
+
 import sys
 from pathlib import Path
 
@@ -55,7 +57,9 @@ def build_dreamer(obs_size: int, action_size: int) -> Dreamer:
             n_recurrent_blocks=N_RECURRENT_BLOCKS,
         ),
         agent=Agent(full_state_size, HIDDEN_DIMS, action_size, N_BINS, act, EMA_DECAY),
-        reward_predictor=MultiLayerPerceptron(full_state_size, HIDDEN_DIMS, N_BINS, act),
+        reward_predictor=MultiLayerPerceptron(
+            full_state_size, HIDDEN_DIMS, N_BINS, act
+        ),
         continue_predictor=MultiLayerPerceptron(full_state_size, HIDDEN_DIMS, 1, act),
         dream_horizon=DREAM_HORIZON,
     )
@@ -147,7 +151,9 @@ def main() -> None:
         modules={"dreamer": dreamer},
     )
     meta = checkpointer.load(CHECKPOINT, device=DEVICE)
-    print(f"Loaded checkpoint — env step {meta['step']}, gradient step {meta['gradient_step']}")
+    print(
+        f"Loaded checkpoint — env step {meta['step']}, gradient step {meta['gradient_step']}"
+    )
 
     print("Running DreamerV3 episode...")
     dreamer_frames, dreamer_reward = run_dreamer_episode(dreamer)

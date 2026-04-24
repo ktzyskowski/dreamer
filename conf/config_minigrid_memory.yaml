@@ -1,0 +1,119 @@
+# Torch --------------------------------------------------------------------- #
+
+torch:
+  device: cuda
+  float32_matmul_precision: high
+
+# Environment --------------------------------------------------------------- #
+
+environment:
+  type: minigrid
+  # MemoryS7/S11/S13/S17 are the stock ladder; swap to a custom longer variant
+  # (e.g. MiniGrid-MemoryS51-v0) once registered for the probe-decay study
+  name: MiniGrid-MemoryS13-v0
+  action_repeat: 1
+  extra_kwargs:
+    # cap episode length; MemoryS13's default (5*size^2 = 845) is wasteful
+    # while the agent can't solve it. 100 gives ~2-3x the optimal solution length.
+    max_episode_steps: 100
+
+# Symlog two-hot encoding --------------------------------------------------- #
+
+two_hot:
+  low: -20.0
+  high: 20.0
+  n_bins: 255
+
+# Replay buffer ------------------------------------------------------------- #
+
+replay_buffer:
+  capacity: 1_000_000
+  dtype: float32
+
+# Models -------------------------------------------------------------------- #
+
+world_model:
+  learning_rate: 0.0003
+
+  # wider posterior gives the probe more signal to read the cue from
+  n_categoricals: 32
+  n_classes: 32
+
+  encoder:
+    mlp:
+      hidden_dims: [ 256, 256 ]
+      activation: rmsnorm_silu
+    cnn:
+      padding: 1
+      stride: 1
+      kernel_size: 3
+      activation: rmsnorm_silu
+      channels: [ 32, 64, 128, 256 ]
+
+  posterior_net:
+    hidden_dims: [ 256, 256 ]
+    activation: rmsnorm_silu
+
+  prior_net:
+    hidden_dims: [ 256, 256 ]
+    activation: rmsnorm_silu
+
+  recurrent_net:
+    # memory tasks need a larger hidden state to carry the cue across the corridor
+    recurrent_size: 512
+    n_blocks: 1
+
+reward_predictor:
+  hidden_dims: [ 256, 256 ]
+  activation: rmsnorm_silu
+
+continue_predictor:
+  hidden_dims: [ 256, 256 ]
+  activation: rmsnorm_silu
+
+actor:
+  learning_rate: 0.0003
+  net:
+    hidden_dims: [ 256, 256 ]
+    activation: rmsnorm_silu
+
+critic:
+  learning_rate: 0.0001
+  ema_decay: 0.98
+  net:
+    hidden_dims: [ 256, 256 ]
+    activation: rmsnorm_silu
+
+dreamer:
+  dream_horizon: 15
+
+# Loss Functions ------------------------------------------------------------ #
+
+world_model_loss:
+  beta_posterior: 0.1
+  beta_prior: 1.0
+  beta_prediction: 1.0
+  free_nats: 1.0
+
+actor_critic_loss:
+  discount: 0.99
+  trace_decay: 0.95
+  entropy_coefficient: 0.0003
+  slow_regularization_weight: 1.0
+  advantage_norm_decay: 0.99
+  beta_critic_dream: 1.0
+  beta_critic_real: 0.3
+
+# Training ------------------------------------------------------------------ #
+
+training:
+  n_steps: 1_000_000
+  batch_size: 4
+  # long enough to span the cue->decision gap in MemoryS13 (and still fit S17)
+  sequence_length: 128
+  warmup_steps: 5_000
+  replay_ratio: 2
+  grad_clip: 1000.0
+  checkpoint_dir: checkpoints
+  save_every_n_gradient_steps: 2_500
+  n_eval_episodes: 5

@@ -1,4 +1,6 @@
+import argparse
 import logging
+import sys
 
 import torch
 
@@ -15,17 +17,25 @@ from src.training.factory import LossFactory, ModelFactory
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    config = load_config(Config)
+
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--config-path", default="conf/config.yaml")
+    args, remaining = parser.parse_known_args()
+    sys.argv = [sys.argv[0], *remaining]
+
+    config = load_config(Config, yaml_path=args.config_path)
 
     env = build_env(
         config.environment.type,
         name=config.environment.name,
         action_repeat=config.environment.action_repeat,
+        extra_kwargs=config.environment.extra_kwargs,
     )
     eval_env = build_env(
         config.environment.type,
         name=config.environment.name,
         action_repeat=config.environment.action_repeat,
+        extra_kwargs=config.environment.extra_kwargs,
     )
     metrics = MetricsAggregator(experiment_name="dreamer")
 

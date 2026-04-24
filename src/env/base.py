@@ -4,9 +4,10 @@ import gymnasium as gym
 
 
 class BaseEnv(ABC):
-    def __init__(self, name: str, action_repeat: int):
+    def __init__(self, name: str, action_repeat: int, extra_kwargs: dict | None = None):
         self.name = name
         self.action_repeat = action_repeat
+        self.extra_kwargs = extra_kwargs or {}
         self._env = None
 
     @property
