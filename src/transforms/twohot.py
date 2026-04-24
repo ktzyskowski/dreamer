@@ -58,6 +58,10 @@ class SymlogTwoHot(nn.Module):
             encoded (*, bins): tensor of symlog two-hot encodings.
         """
         y_symlog = symlog(y)
+        # clamp to bin range so out-of-range values snap to the edge bin with
+        # valid [0, 1] weights (otherwise upper/lower weights go negative / >1
+        # and the target is no longer a probability distribution).
+        y_symlog = y_symlog.clamp(self.low, self.high)
 
         # find lower bin indices
         k = torch.bucketize(y_symlog, self.bins) - 1

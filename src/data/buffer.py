@@ -141,7 +141,9 @@ class ReplayBuffer:
         self, batch_size: int, sequence_length: int, device="cpu", dtype=torch.float32
     ) -> dict:
         batch = self.sample(batch_size, sequence_length)
+        # Cast dtype on CPU before transfer: MPS has had bugs with
+        # bool -> float dtype conversion during host->device copy.
         return {
-            k: torch.from_numpy(v).to(dtype=dtype, device=device, non_blocking=True)
+            k: torch.from_numpy(v).to(dtype=dtype).to(device=device)
             for k, v in batch.items()
         }
