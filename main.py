@@ -13,6 +13,7 @@ from src.training.evaluator import Evaluator
 from src.training.metrics import MetricsAggregator
 from src.training.trainer import Trainer
 from src.training.factory import LossFactory, ModelFactory
+from src.util.torch_util import get_device
 
 
 def main():
@@ -37,7 +38,7 @@ def main():
         action_repeat=config.environment.action_repeat,
         extra_kwargs=config.environment.extra_kwargs,
     )
-    metrics = MetricsAggregator(experiment_name="dreamer")
+    metrics = MetricsAggregator(experiment_name=config.experiment_name)
 
     loss_factory = LossFactory(config)
     world_model_loss = loss_factory.new_world_model_loss()
@@ -60,13 +61,16 @@ def main():
             torch.set_float32_matmul_precision(config.torch.float32_matmul_precision)
 
         device = config.torch.device
-        if device == "cuda" and not torch.cuda.is_available():
-            logging.warning("cuda requested but not available, falling back to cpu")
-            device = "cpu"
+        device = get_device(priority=device)
+        # if device == "cuda" and not torch.cuda.is_available():
+        #     logging.warning("cuda requested but not available, falling back to cpu")
+        #     device = "cpu"
 
         model_factory = ModelFactory(config, observation_shape, action_size)
         encoder, decoder = model_factory.new_encoder_decoder()
-        world_model, reward_predictor, continue_predictor = model_factory.new_world_model()
+        world_model, reward_predictor, continue_predictor = (
+            model_factory.new_world_model()
+        )
         actor, critic = model_factory.new_actor_critic()
         dreamer = Dreamer(
             encoder=encoder,
