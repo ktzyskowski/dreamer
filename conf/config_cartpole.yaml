@@ -82,7 +82,7 @@ actor_critic_loss:
 # Training ======================================================== #
 
 training:
-  n_steps: 30_000
+  n_steps: 10_000_000
   batch_size: 32
   sequence_length: 64
   warmup_steps: 5_000
