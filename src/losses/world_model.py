@@ -33,15 +33,11 @@ class WorldModelLoss(nn.Module):
             low=two_hot_low, high=two_hot_high, n_bins=two_hot_n_bins
         )
 
-    def prior_loss(self, observed_output: dict) -> torch.Tensor:
-        """Compute dynamics loss from equation (3) in the DreamerV3 paper.
+    def _kl_masked_mean(self, loss: torch.Tensor, valid: torch.Tensor) -> torch.Tensor:
+        """Average KL loss over valid (non-reset) timesteps only."""
+        return (loss * valid).sum() / valid.sum().clamp(min=1)
 
-        Args:
-            observed_output (dict): a dictionary with the outputs from the world model forward pass,
-                used to calculate loss. Accesses `posterior_logits` and `prior_logits` keys.
-        Returns:
-            torch.Tensor: the dynamics loss (prior).
-        """
+    def prior_loss(self, observed_output: dict, valid: torch.Tensor) -> torch.Tensor:
         # Dynamics loss in Eq (3): KL(sg[posterior] || prior)
         posterior = multi_categorical(
             observed_output["posterior_logits"].detach(),
@@ -52,17 +48,9 @@ class WorldModelLoss(nn.Module):
             observed_output["prior_logits"], self.n_categoricals, self.n_classes
         )
         loss = kl_divergence(posterior, prior)
-        return torch.clamp(loss, min=self.free_nats).mean()
+        return self._kl_masked_mean(torch.clamp(loss, min=self.free_nats), valid)
 
-    def posterior_loss(self, observed_output: dict) -> torch.Tensor:
-        """Compute representation loss from equation (3) in the DreamerV3 paper.
-
-        Args:
-            observed_output (dict): a dictionary with the outputs from the world model forward pass,
-                used to calculate loss. Accesses `posterior_logits` and `prior_logits` keys.
-        Returns:
-            torch.Tensor: the representation loss (posterior).
-        """
+    def posterior_loss(self, observed_output: dict, valid: torch.Tensor) -> torch.Tensor:
         # Representation loss in Eq (3): KL(posterior || sg[prior])
         posterior = multi_categorical(
             observed_output["posterior_logits"], self.n_categoricals, self.n_classes
@@ -73,7 +61,7 @@ class WorldModelLoss(nn.Module):
             self.n_classes,
         )
         loss = kl_divergence(posterior, prior)
-        return torch.clamp(loss, min=self.free_nats).mean()
+        return self._kl_masked_mean(torch.clamp(loss, min=self.free_nats), valid)
 
     def prediction_loss(
         self, batch: dict, observed_output: dict
@@ -122,8 +110,12 @@ class WorldModelLoss(nn.Module):
     def forward(
         self, batch: dict, observed_output: dict
     ) -> tuple[torch.Tensor, dict[str, float]]:
-        prior_loss = self.prior_loss(observed_output)
-        posterior_loss = self.posterior_loss(observed_output)
+        # steps where h=0 had their recurrent state reset (episode/sequence start);
+        # the prior has no context there and receives contradictory gradients from
+        # different random episode initializations, so exclude them from KL losses.
+        valid = (observed_output["recurrent_states"].abs().sum(-1) > 0).float()
+        prior_loss = self.prior_loss(observed_output, valid)
+        posterior_loss = self.posterior_loss(observed_output, valid)
         observation_loss, continue_loss, reward_loss = self.prediction_loss(
             batch, observed_output
         )
