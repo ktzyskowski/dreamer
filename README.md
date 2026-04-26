@@ -31,7 +31,7 @@ src/
 ├── data/buffer.py       # Replay buffer
 ├── env/                 # Env wrappers (vector, pixel, MiniGrid, cue-delay-choice)
 ├── training/            # Trainer, collector, evaluator, checkpointing, metrics
-└── config/              # Hydra configs (typed dataclasses)
+└── config/              # Configs (typed dataclasses)
 ```
 
 The world model is a self-contained dynamics module; imagination and policy logic live in the `Dreamer` class.
