@@ -60,7 +60,7 @@ mlflow ui
 
 ## Implementation notes
 
-These are notes from the build process — subtle issues I ran into, design decisions, and observations that may be useful to others reproducing the algorithm.
+These are notes from the build process - subtle issues I ran into, design decisions, and observations that may be useful to others reproducing the algorithm.
 
 ### Posterior/prior KL loss in stochastic start states
 
