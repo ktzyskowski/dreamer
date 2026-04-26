@@ -1,10 +1,11 @@
 import argparse
+import dataclasses
 import logging
 import sys
 
 import torch
 
-from src.config import Config, load_config
+from src.config import Config, flatten, load_config
 from src.data.buffer import ReplayBuffer
 from src.env.factory import build_env
 from src.rl.dreamer import Dreamer
@@ -45,6 +46,8 @@ def main():
     actor_critic_loss = loss_factory.new_actor_critic_loss()
 
     with metrics, env, eval_env:
+        metrics.log_params(flatten(dataclasses.asdict(config)))
+
         observation_shape = env.observation_space.shape
         action_size = env.action_size
 
