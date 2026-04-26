@@ -8,11 +8,11 @@ As always, I find that the best way to learn how something works is to build it 
 
 ## Status
 
-**CartPole-v1:** in progress. Currently tuning entropy regularization and replay ratio to reach the standard solve threshold (mean return ≥ 475 over 100 eval episodes).
+**CartPole-v1:** solved. Reached mean return of 491 over 100 greedy eval episodes, exceeding the standard solve threshold of 475.
+
+![CartPole eval performance](visualizations/cartpole-eval.png)
 
 **MiniGrid Memory:** in progress.
-
-![CartPole training curve](docs/cartpole_curve.png)
 
 ## Architecture
 

@@ -102,7 +102,7 @@ class Trainer:
         observed_output = self.dreamer.observe(batch)
         world_model_loss, world_model_metrics = self.world_model_loss(batch, observed_output)
         world_model_loss.backward()
-        nn.utils.clip_grad_norm_(self.dreamer.world_model_parameters(), self.grad_clip)
+        world_model_gradient_norm = nn.utils.clip_grad_norm_(self.dreamer.world_model_parameters(), self.grad_clip)
         self.world_model_optimizer.step()
 
         # Actor / Critic ----------------------------------------------- #
@@ -130,14 +130,20 @@ class Trainer:
             real_continues=1.0 - batch["dones"],
         )
         actor_critic_loss.backward()
-        nn.utils.clip_grad_norm_(self.dreamer.actor_parameters(), self.grad_clip)
-        nn.utils.clip_grad_norm_(self.dreamer.critic_parameters(), self.grad_clip)
+        actor_gradient_norm = nn.utils.clip_grad_norm_(self.dreamer.actor_parameters(), self.grad_clip)
+        critic_gradient_norm = nn.utils.clip_grad_norm_(self.dreamer.critic_parameters(), self.grad_clip)
         self.actor_optimizer.step()
         self.critic_optimizer.step()
         self.dreamer.critic.update_slow()
 
         # Bookkeeping -------------------------------------------------- #
-        self.metrics.update({**world_model_metrics, **actor_critic_metrics})
+        self.metrics.update({
+            **world_model_metrics,
+            **actor_critic_metrics,
+            "grad_norm/world_model": world_model_gradient_norm.item(),
+            "grad_norm/actor": actor_gradient_norm.item(),
+            "grad_norm/critic": critic_gradient_norm.item(),
+        })
         self.metrics.maybe_flush(step)
 
         if step % 25 == 0:
