@@ -87,8 +87,9 @@ def main():
             # compile the per-gradient-step hot paths, they contain tight
             # python loops over sequence_length and dream_horizon; compiling
             # collapses the per-step MLP + GRU kernels and cuts launch overhead.
-            dreamer.observe = torch.compile(dreamer.observe, dynamic=False)
-            dreamer.dream = torch.compile(dreamer.dream, dynamic=False)
+            dreamer = torch.compile(dreamer)
+            # dreamer.observe = torch.compile(dreamer.observe, dynamic=False)
+            # dreamer.dream = torch.compile(dreamer.dream, dynamic=False)
 
         # ------------------------------------------------------------------- #
 

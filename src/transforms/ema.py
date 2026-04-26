@@ -26,5 +26,5 @@ class ExpMovingAverage(nn.Module):
             average (torch.Tensor): the updated EMA value.
         """
         assert self.average.shape == x.shape
-        self.average = self.decay * self.average + (1 - self.decay) * x
+        self.average = (self.decay * self.average + (1 - self.decay) * x).detach()
         return self.average

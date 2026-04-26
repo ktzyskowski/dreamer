@@ -26,7 +26,7 @@ class Trainer:
         batch_size: int = 32,
         sequence_length: int = 32,
         warmup_steps: int = 1_024,
-        replay_ratio: int = 4,
+        replay_ratio: float = 4.0,
         world_model_lr: float = 3e-4,
         actor_lr: float = 3e-4,
         critic_lr: float = 1e-4,
@@ -53,6 +53,7 @@ class Trainer:
         self.evaluator = evaluator
         self.eval_every_n_gradient_steps = eval_every_n_gradient_steps
         self.replay_ratio = replay_ratio
+        self._grad_budget = 0.0
 
         # Optimizers -------------------------------------------------------- #
 
@@ -82,7 +83,9 @@ class Trainer:
                 self.metrics.log(episode_stats, step=step)
 
             if step >= self.warmup_steps:
-                for _ in range(self.replay_ratio):
+                self._grad_budget += self.replay_ratio
+                while self._grad_budget >= 1.0:
+                    self._grad_budget -= 1.0
                     gradient_step += 1
                     self.gradient_step(gradient_step)
 
@@ -108,12 +111,12 @@ class Trainer:
 
         # freeze world-model side so actor-critic gradients don't leak through
         # reward_predictor / continue_predictor / world_model into its params
-        self.dreamer.freeze_world_model()
+        # self.dreamer.freeze_world_model()
         dream_output = self.dreamer.dream(
             full_states=observed_output["full_states"].detach(),
             recurrent_states=observed_output["recurrent_states"].detach(),
         )
-        self.dreamer.unfreeze_world_model()
+        # self.dreamer.unfreeze_world_model()
 
         critic = self.dreamer.critic
         full_states = dream_output["full_states"]

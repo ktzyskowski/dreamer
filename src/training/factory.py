@@ -1,6 +1,7 @@
 from src.config import Config, resolve_activation
 from src.losses.actor_critic import ActorCriticLoss
 from src.losses.world_model import WorldModelLoss
+from src.nets.cnn import ConvNet2D, ConvTransposeNet2D
 from src.nets.mlp import MultiLayerPerceptron
 from src.rl.critic import DualCritic
 from src.rl.world_model import WorldModel
@@ -17,18 +18,40 @@ class ModelFactory:
         self.action_size = action_size
 
     def new_encoder_decoder(self):
-        encoder = MultiLayerPerceptron(
-            input_dim=self.observation_shape[0],
-            hidden_dims=self.config.world_model.encoder.mlp.hidden_dims,
-            output_dim=self.latent_size,
-            activation=resolve_activation(self.config.world_model.encoder.mlp.activation),
-        )
-        decoder = MultiLayerPerceptron(
-            input_dim=self.full_state_size,
-            hidden_dims=self.config.world_model.encoder.mlp.hidden_dims,
-            output_dim=self.observation_shape[0],
-            activation=resolve_activation(self.config.world_model.encoder.mlp.activation),
-        )
+        if len(self.observation_shape) == 3:
+            activation = resolve_activation(self.config.world_model.encoder.cnn.activation)
+            encoder = ConvNet2D(
+                input_shape=self.observation_shape,
+                output_size=self.latent_size,
+                kernel_size=self.config.world_model.encoder.cnn.kernel_size,
+                stride=self.config.world_model.encoder.cnn.stride,
+                padding=self.config.world_model.encoder.cnn.padding,
+                channels=self.config.world_model.encoder.cnn.channels,
+                activation=activation,
+            )
+            decoder = ConvTransposeNet2D(
+                input_shape=self.observation_shape,
+                output_size=self.full_state_size,
+                kernel_size=self.config.world_model.encoder.cnn.kernel_size,
+                stride=self.config.world_model.encoder.cnn.stride,
+                padding=self.config.world_model.encoder.cnn.padding,
+                channels=self.config.world_model.encoder.cnn.channels,
+                activation=activation,
+            )
+        else:
+            activation = resolve_activation(self.config.world_model.encoder.mlp.activation)
+            encoder = MultiLayerPerceptron(
+                input_dim=self.observation_shape[0],
+                hidden_dims=self.config.world_model.encoder.mlp.hidden_dims,
+                output_dim=self.latent_size,
+                activation=activation,
+            )
+            decoder = MultiLayerPerceptron(
+                input_dim=self.full_state_size,
+                hidden_dims=self.config.world_model.encoder.mlp.hidden_dims,
+                output_dim=self.observation_shape[0],
+                activation=activation,
+            )
         return encoder, decoder
 
     def new_world_model(self):

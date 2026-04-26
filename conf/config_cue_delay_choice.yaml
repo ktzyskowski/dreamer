@@ -1,4 +1,4 @@
-experiment_name: minigrid-memory
+experiment_name: cue-delay-choice
 
 # Torch --------------------------------------------------------------------- #
 
@@ -9,15 +9,12 @@ torch:
 # Environment --------------------------------------------------------------- #
 
 environment:
-  type: minigrid
-  # MemoryS7/S11/S13/S17 are the stock ladder; swap to a custom longer variant
-  # (e.g. MiniGrid-MemoryS51-v0) once registered for the probe-decay study
-  name: MiniGrid-MemoryS7-v0
+  type: cue-delay-choice
+  name: CueDelayChoice-4a5d
   action_repeat: 1
   extra_kwargs:
-    # cap episode length; MemoryS13's default (5*size^2 = 845) is wasteful
-    # while the agent can't solve it. 100 gives ~2-3x the optimal solution length.
-    max_episode_steps: 100
+    n_actions: 4
+    delay_steps: 5
 
 # Symlog two-hot encoding --------------------------------------------------- #
 

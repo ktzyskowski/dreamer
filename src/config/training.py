@@ -7,7 +7,7 @@ class TrainingConfig:
     batch_size: int = 32
     sequence_length: int = 32
     warmup_steps: int = 1_024
-    replay_ratio: int = 4
+    replay_ratio: float = 4.0
     grad_clip: float = 1000.0
     checkpoint_dir: str = "checkpoints"
     save_every_n_gradient_steps: int = 1_000

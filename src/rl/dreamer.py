@@ -166,7 +166,7 @@ class Dreamer(nn.Module):
         """
         # GRU cells require a leading batch dim; manage it internally so the
         # Collector can keep holding unbatched per-env state
-        encoded = self.encoder(observation).unsqueeze(0)
+        encoded = self.encoder(observation.unsqueeze(0))
         recurrent_state = recurrent_state.unsqueeze(0)
 
         latent_state = self.world_model.get_posterior_latent_state(encoded, recurrent_state)

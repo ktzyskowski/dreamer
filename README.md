@@ -29,3 +29,9 @@ To get total LoC (out of curiosity) you can use this command:
 ```zsh
 find . -name "*.py" -not -path "./.venv/*" | xargs wc -l | sort -rn
 ```
+
+## Notes
+
+### 1. Posterior/Prior KL Loss in Stochastic Start States
+
+In environments with stochastic start states (such as in the Memory minigrid task in which the object cue is randomly selected), the prior has no way of correctly predicting the latent state given an initial zero recurrent tensor (opposed to the posterior which does have an observation). This is problematic because the prior has no clear learning signal, and the posterior is pulled towards the prior, so both are being negatively affected. The fix is simply to mask the KL loss when the recurrent state for the timestep is the initial zero tensor. This way, the noise is removed during loss calculation.
